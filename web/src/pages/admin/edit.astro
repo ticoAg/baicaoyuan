@@ -2,7 +2,8 @@
 // 维护后台：新建或编辑一个词条的名称、类别和图片。
 import { env } from 'cloudflare:workers';
 import Base from '../../layouts/Base.astro';
-import { LICENSES, SESSION, whoIs } from '../../lib/admin';
+import { SESSION, whoIs } from '../../lib/admin';
+import { SITE } from '../../lib/shared.js';
 import { applyPatch, notFound, validId, type Img, type Species } from '../../lib/species';
 
 export const prerender = false;
@@ -32,7 +33,7 @@ if (id) {
   created = !!row?.created;
 }
 const title = id ? (sp.zh ?? sp.sci) : '新建词条';
-const licenses = Object.keys(LICENSES);
+const credit = who.role === 'admin' ? SITE.name : who.name;
 ---
 <Base title={id ? `编辑 ${title}` : '新建词条'} headerSearch={false}>
   <meta slot="head" name="robots" content="noindex" />
@@ -40,7 +41,7 @@ const licenses = Object.keys(LICENSES);
     <nav class="crumbs" aria-label="位置"><a href="/admin/">维护</a>{id && <><span aria-hidden="true">›</span><a href={`/s/${id}`}>{title}</a></>}</nav>
     <h1 class="page-title">{id ? title : '新建词条'}</h1>
 
-    <form class="edit" data-edit data-id={id ?? ''} data-me={who.role === 'admin' ? '' : who.name}>
+    <form class="edit" data-edit data-id={id ?? ''}>
       <fieldset>
         <legend>名称</legend>
         <label>学名
@@ -58,50 +59,35 @@ const licenses = Object.keys(LICENSES);
         </div>
         <label>科<input name="fam" class="sci" value={sp.fam ?? ''} list="families" placeholder="Meliaceae" autocomplete="off" spellcheck="false" /></label>
         <label>科的中文名<input name="famZh" value={sp.famZh ?? ''} placeholder="楝科" autocomplete="off" /></label>
-        <label>属<input name="gen" class="sci" value={sp.gen ?? ''} placeholder="Toona" autocomplete="off" spellcheck="false" /></label>
+        <label>属<output class="sci" data-gen>{sp.gen ?? ''}</output></label>
         <label>属的中文名<input name="genZh" value={sp.genZh ?? ''} placeholder="香椿属" autocomplete="off" /></label>
         <datalist id="families"></datalist>
       </fieldset>
 
       <fieldset>
         <legend>图片</legend>
-        <ul class="shots wide" data-shots>
+        <ul class="pics wide" data-pics>
           {(sp.imgs ?? []).map((im) => (
-            <li class="shot-card" data-url={im.url}>
+            <li class="pic" data-url={im.url}>
               <img src={im.thumb} alt="" />
-              <div class="shot-fields">
-                <label>作者<input data-f="author" value={im.author} autocomplete="off" /></label>
-                <label>许可<select data-f="license">{licenses.map((l) => <option selected={im.license === l}>{l}</option>)}</select></label>
-                <label class="wide">来源链接<input data-f="page" type="url" value={im.page ?? ''} placeholder="可不填" autocomplete="off" /></label>
-              </div>
-              <div class="shot-acts"><button type="button" class="btn" data-first>设为首图</button><button type="button" class="btn" data-drop>去掉</button></div>
+              <div><button type="button" data-first>设为首图</button><button type="button" data-drop>去掉</button></div>
             </li>
           ))}
+          {dataImage && (
+            <li class:list={['pic', { off: !sp.img }]} data-data>
+              <img src={dataImage.thumb} alt="" referrerpolicy="no-referrer" />
+              <div><button type="button" data-toggle>{sp.img ? '去掉' : '恢复'}</button></div>
+            </li>
+          )}
+          <li class="pic-add"><label><b aria-hidden="true">＋</b>添加照片<input type="file" name="image" accept="image/*" multiple class="visually-hidden" /></label></li>
         </ul>
-        <template data-shot>
-          <li class="shot-card">
+        <template data-pic>
+          <li class="pic">
             <img alt="" />
-            <div class="shot-fields">
-              <label>作者<input data-f="author" autocomplete="off" /></label>
-              <label>许可<select data-f="license">{licenses.map((l) => <option>{l}</option>)}</select></label>
-              <label class="wide">来源链接<input data-f="page" type="url" placeholder="可不填" autocomplete="off" /></label>
-            </div>
-            <div class="shot-acts"><button type="button" class="btn" data-first>设为首图</button><button type="button" class="btn" data-drop>去掉</button></div>
+            <div><button type="button" data-first>设为首图</button><button type="button" data-drop>去掉</button></div>
           </li>
         </template>
-        <div class="wide">
-          <label class="btn">添加照片<input type="file" name="image" accept="image/*" multiple class="visually-hidden" /></label>
-          <p class="note">最多 8 张，第一张是首图。只传自己拍的，或者许可允许转载的照片。</p>
-        </div>
-        {dataImage && (
-          <div class="data-image wide">
-            <img src={dataImage.thumb} alt="" referrerpolicy="no-referrer" />
-            <div>
-              <p>数据里的图，排在上传的图后面。<span class="muted">{dataImage.author} · {dataImage.license}</span></p>
-              <label><input type="checkbox" name="hideDataImage" checked={!sp.img} />这张不对，不显示</label>
-            </div>
-          </div>
-        )}
+        <p class="note wide">只传自己拍的照片，署名{credit}，按 CC BY 4.0 公开。</p>
       </fieldset>
 
       <div class="edit-actions">

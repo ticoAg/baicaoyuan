@@ -45,8 +45,6 @@ CREATE TABLE IF NOT EXISTS users (
   name    TEXT PRIMARY KEY,
   salt    TEXT NOT NULL,
   hash    TEXT NOT NULL,
-  contact TEXT NOT NULL,
-  reason  TEXT NOT NULL,
   status  TEXT NOT NULL,
   created TEXT NOT NULL
 ) WITHOUT ROWID;

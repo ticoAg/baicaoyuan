@@ -13,12 +13,7 @@ const MESSAGES: Record<string, string> = {
   full: '申请太多，暂时收不下，过几天再来。',
   name: '名字用 2 到 20 个字，不带空格和符号。',
   password: '密码至少 8 位。',
-  contact: '留一个联系方式。',
-  reason: '写一下想维护什么。',
   sci: '学名要写成"属名 种加词"，如 Toona sinensis。',
-  gen: '属名要用拉丁字母。',
-  author: '每张图片都要写作者。',
-  license: '每张图片都要选许可。',
   image: '有一张照片存不了，换一张试试。',
 };
 const say = (form: HTMLElement, text: string) => (form.querySelector<HTMLElement>('.form-msg')!.textContent = text);
@@ -54,13 +49,13 @@ document.querySelector('[data-logout]')?.addEventListener('click', async () => {
   location.reload();
 });
 
-// 申请
-const apply = document.querySelector<HTMLFormElement>('[data-apply]');
-apply?.addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  if (!(await send(apply, '/api/admin/apply', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(fields(apply)) }))) return;
-  apply.hidden = true;
-  document.querySelector<HTMLElement>('[data-applied]')!.hidden = false;
+// 申请：用同一个表单里的名字和密码
+login?.querySelector('[data-apply]')?.addEventListener('click', async () => {
+  if (!login.reportValidity()) return;
+  if (!(await send(login, '/api/admin/apply', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(fields(login)) }))) return;
+  login.querySelectorAll('button').forEach((b) => (b.disabled = false));
+  say(login, '申请已提交，通过后用这个名字和密码登录。');
+  login.querySelector('.form-msg')!.classList.add('ok');
 });
 
 // 管理员处理申请和维护者
@@ -94,8 +89,13 @@ const edit = document.querySelector<HTMLFormElement>('[data-edit]');
 if (edit) {
   const id = edit.dataset.id!;
   const field = (name: string) => edit.elements.namedItem(name) as HTMLInputElement;
-  const shots = edit.querySelector<HTMLElement>('[data-shots]')!;
-  const blank = edit.querySelector<HTMLTemplateElement>('[data-shot]')!;
+  const pics = edit.querySelector<HTMLElement>('[data-pics]')!;
+  const blank = edit.querySelector<HTMLTemplateElement>('[data-pic]')!;
+  const adder = pics.querySelector<HTMLElement>('.pic-add')!;
+  /** 上传的图：已经存着的和刚选的。数据里自带的那张不算。 */
+  const uploaded = () => [...pics.querySelectorAll<HTMLElement>('.pic:not([data-data])')];
+  const sync = () => (adder.hidden = uploaded().length >= MAX_IMAGES);
+  sync();
   /** 新选的照片，还没上传。 */
   const fresh = new WeakMap<Element, File>();
 
@@ -117,33 +117,34 @@ if (edit) {
   if (!id) {
     field('sci').addEventListener('change', async () => {
       const genus = field('sci').value.trim().split(/\s+/)[0] ?? '';
+      edit.querySelector('[data-gen]')!.textContent = genus;
       if (!/^[A-Z][a-z-]+$/.test(genus)) return;
-      if (!field('gen').value) field('gen').value = genus;
       const known = (await fetch(`/api/admin/genus?name=${genus}`).then((r) => r.json()).catch(() => ({}))) as Record<string, string>;
       for (const key of ['fam', 'famZh', 'genZh']) if (known[key] && !field(key).value) field(key).value = known[key];
       if (known.k) edit.querySelector<HTMLInputElement>(`input[name=k][value=${known.k}]`)!.checked = true;
     });
   }
 
-  // 图片：选了就加一张卡片，保存时才上传
+  // 图片：选了就加一格，保存时才上传
   field('image').addEventListener('change', () => {
-    const lastAuthor = [...shots.querySelectorAll<HTMLInputElement>('[data-f=author]')].at(-1)?.value;
     for (const file of [...(field('image').files ?? [])]) {
-      if (shots.children.length >= MAX_IMAGES) break;
-      const card = (blank.content.cloneNode(true) as DocumentFragment).firstElementChild!;
-      card.querySelector('img')!.src = URL.createObjectURL(file);
-      card.querySelector<HTMLInputElement>('[data-f=author]')!.value = lastAuthor || edit.dataset.me || '';
-      fresh.set(card, file);
-      shots.append(card);
+      if (uploaded().length >= MAX_IMAGES) break;
+      const pic = (blank.content.cloneNode(true) as DocumentFragment).firstElementChild!;
+      pic.querySelector('img')!.src = URL.createObjectURL(file);
+      fresh.set(pic, file);
+      (pics.querySelector('[data-data]') ?? adder).before(pic);
     }
     field('image').value = '';
+    sync();
   });
-  shots.addEventListener('click', (ev) => {
+  pics.addEventListener('click', (ev) => {
     const button = (ev.target as HTMLElement).closest('button');
-    const card = button?.closest('.shot-card');
-    if (!button || !card) return;
-    if (button.hasAttribute('data-drop')) card.remove();
-    else if (button.hasAttribute('data-first')) shots.prepend(card);
+    const pic = button?.closest('.pic');
+    if (!button || !pic) return;
+    if (button.hasAttribute('data-drop')) pic.remove();
+    else if (button.hasAttribute('data-first')) pics.prepend(pic);
+    else button.textContent = pic.classList.toggle('off') ? '恢复' : '去掉';
+    sync();
   });
 
   edit.addEventListener('submit', async (ev) => {
@@ -152,17 +153,15 @@ if (edit) {
     const body = new FormData();
     const images = [];
     try {
-      for (const card of shots.children) {
-        const of = (f: string) => card.querySelector<HTMLInputElement>(`[data-f=${f}]`)!.value.trim();
-        const credit = { author: of('author'), license: of('license'), page: of('page') };
-        const file = fresh.get(card);
-        if (!file) images.push({ url: (card as HTMLElement).dataset.url, ...credit });
+      for (const pic of uploaded()) {
+        const file = fresh.get(pic);
+        if (!file) images.push({ url: pic.dataset.url });
         else {
           const n = images.length;
           const [big, small] = await Promise.all([shrink(file, 1600), shrink(file, 500, 0.82)]);
           body.append(`image${n}`, big, 'photo.jpg');
           body.append(`thumb${n}`, small, 'thumb.jpg');
-          images.push({ file: n, ...credit });
+          images.push({ file: n });
         }
       }
     } catch {
@@ -178,10 +177,9 @@ if (edit) {
         alias: value('alias').split(/[、，,;；\n]+/).map((a) => a.trim()).filter(Boolean),
         fam: value('fam'),
         famZh: value('famZh'),
-        gen: value('gen'),
         genZh: value('genZh'),
         images,
-        hideDataImage: !!field('hideDataImage')?.checked,
+        hideDataImage: !!pics.querySelector('[data-data].off'),
       }),
     );
     const saved = await send(edit, '/api/admin/species', { method: 'POST', body });

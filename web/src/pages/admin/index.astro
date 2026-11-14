@@ -1,5 +1,5 @@
 ---
-// 维护后台：登录；找一个物种来改，或者新建词条；管理员在这里处理维护者的申请。
+// 维护后台：登录或申请；找一个物种来改，或者新建词条；管理员在这里处理维护者的申请。
 import { env } from 'cloudflare:workers';
 import Base from '../../layouts/Base.astro';
 import SearchBox from '../../components/SearchBox.astro';
@@ -10,7 +10,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
 const who = await whoIs(Astro.cookies.get(SESSION)?.value);
 interface Row { id: string; patch: string; created: number; updated: string; by: string; zh: string | null; sci: string | null }
-interface User { name: string; contact: string; reason: string; status: string; created: string }
+interface User { name: string; status: string; created: string }
 let edits: { id: string; zh?: string; sci: string; created: boolean; day: string; by: string }[] = [];
 let users: User[] = [];
 if (who) {
@@ -23,7 +23,7 @@ if (who) {
     return { id: r.id, zh: (patch.zh === null ? undefined : patch.zh) ?? r.zh ?? undefined, sci: patch.sci ?? r.sci ?? r.id, created: !!r.created, day: r.updated.slice(0, 10), by: r.by };
   });
   if (who.role === 'admin') {
-    users = (await env.DB.prepare('SELECT name, contact, reason, status, created FROM users ORDER BY status DESC, created DESC LIMIT 500').all<User>()).results;
+    users = (await env.DB.prepare('SELECT name, status, created FROM users ORDER BY status DESC, created DESC LIMIT 500').all<User>()).results;
   }
 }
 const pending = users.filter((u) => u.status === 'pending');
@@ -35,15 +35,13 @@ const active = users.filter((u) => u.status === 'active');
     <h1 class="page-title">维护</h1>
     {!who ? (
       adminEnabled() ? (
-        <>
-          <form class="admin-login" data-login>
-            <input name="name" placeholder="名字" autocomplete="username" required autofocus aria-label="名字" />
-            <input type="password" name="password" placeholder="密码" autocomplete="current-password" required aria-label="密码" />
-            <button class="btn primary">登录</button>
-            <p class="form-msg" role="alert"></p>
-          </form>
-          <p class="note" style="margin-top:1.2rem">还不是维护者？<a href="/admin/apply">申请</a></p>
-        </>
+        <form class="admin-login" data-login>
+          <input name="name" placeholder="名字" autocomplete="username" required autofocus aria-label="名字" />
+          <input type="password" name="password" placeholder="密码" autocomplete="current-password" required aria-label="密码" />
+          <button class="btn primary">登录</button>
+          <button type="button" class="btn" data-apply>申请成为维护者</button>
+          <p class="form-msg" role="alert"></p>
+        </form>
       ) : <p class="lead">后台还没有启用。</p>
     ) : (
       <>
@@ -58,9 +56,8 @@ const active = users.filter((u) => u.status === 'active');
             <ul class="people">
               {pending.map((u) => (
                 <li data-user={u.name}>
-                  <div><b>{u.name}</b><span>{u.contact}</span><span class="muted">{u.created.slice(0, 10)}</span></div>
-                  <p>{u.reason}</p>
-                  <div class="people-acts"><button type="button" class="btn primary" data-approve>通过</button><button type="button" class="btn" data-reject>拒绝</button></div>
+                  <b>{u.name}</b><span class="muted">{u.created.slice(0, 10)}</span>
+                  <button type="button" class="btn primary" data-approve>通过</button><button type="button" class="btn" data-reject>拒绝</button>
                 </li>
               ))}
             </ul>
@@ -89,9 +86,7 @@ const active = users.filter((u) => u.status === 'active');
             <h2>维护者<span class="count">{active.length}</span></h2>
             <ul class="people">
               {active.map((u) => (
-                <li data-user={u.name}>
-                  <div><b>{u.name}</b><span>{u.contact}</span><button type="button" class="btn danger" data-reject>移除</button></div>
-                </li>
+                <li data-user={u.name}><b>{u.name}</b><button type="button" class="btn danger" data-reject>移除</button></li>
               ))}
             </ul>
           </section>

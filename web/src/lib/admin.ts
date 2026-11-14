@@ -15,14 +15,6 @@ export const COOKIE = { path: '/', secure: true, sameSite: 'strict', maxAge: DAY
 
 export interface Who { role: 'admin' | 'maintainer'; name: string }
 
-/** 上传图片时可选的许可。 */
-export const LICENSES: Record<string, string | undefined> = {
-  'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/',
-  'CC BY-SA 4.0': 'https://creativecommons.org/licenses/by-sa/4.0/',
-  'CC0 1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
-  公有领域: undefined,
-};
-
 const enc = new TextEncoder();
 const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 

@@ -1,29 +1,28 @@
 // 后台保存、删除一个词条的改动。
 //
 // 已有的物种只存和数据不一样的字段，所以数据更新时没改过的字段照常更新；
-// 新建的词条整份存在 edits 表里。图片存 R2，词条里记它们的地址、作者和许可，顺序就是显示的顺序。
+// 新建的词条整份存在 edits 表里。图片存 R2，词条里记它们的地址和署名，顺序就是显示的顺序。
 // 每次保存在 edit_log 里留一条记录。
 
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { guard, LICENSES, purge, reply, SESSION } from '../../../lib/admin';
-import { slugOf } from '../../../lib/shared.js';
+import { guard, purge, reply, SESSION } from '../../../lib/admin';
+import { SITE, slugOf } from '../../../lib/shared.js';
 import { validId, type Img, type Species } from '../../../lib/species';
 
 export const prerender = false;
 
 const MAX_IMAGE = 3 * 1024 * 1024;
 const MAX_IMAGES = 8;
-const TEXT = ['zh', 'fam', 'famZh', 'gen', 'genZh'] as const;
+const LICENSE = 'CC BY 4.0';
+const LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/';
+const TEXT = ['zh', 'fam', 'famZh', 'genZh'] as const;
 
 interface ImageInput {
   /** 已经传过的图，用它的地址指认。 */
   url?: string;
   /** 这次新传的图，在表单里叫 image{n} 和 thumb{n}。 */
   file?: number;
-  author?: string;
-  license?: string;
-  page?: string;
 }
 interface Input {
   id?: string;
@@ -33,7 +32,6 @@ interface Input {
   alias?: string[];
   fam?: string;
   famZh?: string;
-  gen?: string;
   genZh?: string;
   images?: ImageInput[];
   /** 不显示数据里自带的那张图。 */
@@ -94,36 +92,28 @@ export const POST: APIRoute = async ({ request, url, cookies }) => {
     alias: alias.filter((a) => a !== zh),
     fam: latin(input.fam),
     famZh: text(input.famZh, 20),
-    gen: latin(input.gen) || (created ? (before.sci ?? sci).split(' ')[0] : ''),
+    gen: (before.sci ?? sci).split(' ')[0],
     genZh: text(input.genZh, 20),
   };
-  if (!next.gen) return bad('gen');
 
-  // 图片：先把每一张核对完，再存文件
+  // 图片：先把每一张核对完，再存文件。新传的图署上传者的名字，按 CC BY 4.0 授权
   const had = new Map((before.imgs ?? []).map((im) => [im.url, im]));
+  const credit = { author: who.role === 'admin' ? SITE.name : who.name, license: LICENSE, licenseUrl: LICENSE_URL, src: 'upload' };
   const imgs: Img[] = [];
   const uploads: [key: string, body: ArrayBuffer][] = [];
   for (const item of (Array.isArray(input.images) ? input.images : []).slice(0, MAX_IMAGES)) {
-    const author = text(item.author, 60);
-    const license = item.license && item.license in LICENSES ? item.license : '';
-    if (!author) return bad('author');
-    if (!license) return bad('license');
-    const page = /^https?:\/\/\S+$/.test(text(item.page, 300)) ? text(item.page, 300) : undefined;
-    let big: string;
-    let small: string;
+    let img: Img;
     if (typeof item.file === 'number') {
       const files = [form?.get(`image${item.file}`), form?.get(`thumb${item.file}`)];
       if (!(files[0] instanceof File) || !(files[1] instanceof File)) return bad('image');
       const [a, b] = await Promise.all((files as File[]).map((f) => f.arrayBuffer()));
       if (!jpeg(a) || !jpeg(b)) return bad('image');
       const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', a)).slice(0, 6)].map((n) => n.toString(16).padStart(2, '0')).join('');
-      [big, small] = [`/img/${id}/${hash}.jpg`, `/img/${id}/${hash}-s.jpg`];
-      uploads.push([keyOf(big), a], [keyOf(small), b]);
-    } else if (item.url && had.has(item.url)) {
-      [big, small] = [item.url, had.get(item.url)!.thumb];
-    } else continue;
-    if (imgs.some((im) => im.url === big)) continue;
-    imgs.push({ url: big, thumb: small, author, license, src: 'upload', ...(LICENSES[license] ? { licenseUrl: LICENSES[license] } : {}), ...(page ? { page } : {}) });
+      img = { url: `/img/${id}/${hash}.jpg`, thumb: `/img/${id}/${hash}-s.jpg`, ...credit };
+      uploads.push([keyOf(img.url), a], [keyOf(img.thumb), b]);
+    } else if (item.url && had.has(item.url)) img = had.get(item.url)!;
+    else continue;
+    if (!imgs.some((im) => im.url === img.url)) imgs.push(img);
   }
   await Promise.all(uploads.map(([key, body]) => env.IMAGES.put(key, body, { httpMetadata: { contentType: 'image/jpeg' } })));
   await removeImages(id, imgs.flatMap((im) => [keyOf(im.url), keyOf(im.thumb)]));
