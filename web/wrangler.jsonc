@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "baicaoyuan",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  // 物种数据。表结构见 db/schema.sql，数据由 scripts/db-sync.mjs 灌入。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "baicaoyuan",
+      "database_id": "1b22732c-c0c3-4ef9-a84e-6aa5dddda245"
+    }
+  ],
+  "observability": { "enabled": true }
+}

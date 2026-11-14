@@ -1,0 +1,32 @@
+---
+import Base from '../../layouts/Base.astro';
+import taxonomy from '../../generated/taxonomy.json';
+const groups = [
+  { k: 'plant', title: '维管植物' },
+  { k: 'fungus', title: '真菌' },
+].map((g) => ({
+  ...g,
+  families: taxonomy.filter((f) => f.k === g.k).map((f) => ({ name: f.name, zh: f.zh, n: f.genera.reduce((a, x) => a + x.species.length, 0) }))
+    .sort((a, b) => (a.zh ?? '￿' + a.name).localeCompare(b.zh ?? '￿' + b.name, 'zh-Hans-CN')),
+}));
+---
+<Base title="分类浏览" current="/t/">
+  <div class="wrap">
+    <h1 class="page-title">分类浏览</h1>
+    <p class="lead">科 → 属 → 种。植物的分类依据 WCVP，真菌依据 Wikidata。</p>
+    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="筛选科名：蔷薇科 / Rosaceae" aria-label="筛选科名" /></p>
+    {groups.map((g) => (
+      <section class="section" data-group>
+        <h2>{g.title} <span class="count">{g.families.length} 科</span></h2>
+        <ul class="fam-index">
+          {g.families.map((f) => (
+            <li data-f={`${f.zh ?? ''} ${f.name}`.toLowerCase()}>
+              <a href={`/t/${f.name}/`}>{f.zh ?? <i class="sci">{f.name}</i>} {f.zh && <span class="muted small">{f.name}</span>}</a>
+              <span class="n">{f.n}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Base>

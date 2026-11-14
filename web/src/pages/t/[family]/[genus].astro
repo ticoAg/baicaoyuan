@@ -1,0 +1,21 @@
+---
+import Base from '../../../layouts/Base.astro';
+import SpeciesList from '../../../components/SpeciesList.astro';
+import taxonomy from '../../../generated/taxonomy.json';
+export function getStaticPaths() {
+  return taxonomy.flatMap((f) => f.genera.map((g) => ({ params: { family: f.name, genus: g.name }, props: { f: { name: f.name, zh: f.zh, k: f.k }, g } })));
+}
+const { f, g } = Astro.props;
+const title = g.zh ?? g.name;
+---
+<Base title={title} current="/t/" description={`${title}（${g.name}），${f.zh ?? f.name}：${g.species.length} 种。`}>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="位置"><a href="/t/">分类</a><span aria-hidden="true">›</span><a href={`/t/${f.name}/`}>{f.zh ?? f.name}</a></nav>
+    <h1 class="page-title">{g.zh ?? <i class="sci">{g.name}</i>}</h1>
+    <p class="lead">{g.zh && <><i class="sci">{g.name}</i> · </>}{g.species.length} 种</p>
+    {g.species.length > 30 && <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /></p>}
+    <section class="section">
+      <SpeciesList items={g.species} />
+    </section>
+  </div>
+</Base>

@@ -1,0 +1,25 @@
+{
+  "name": "baicaoyuan-web",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "db:local": "node scripts/db-sync.mjs --local",
+    "db:remote": "node scripts/db-sync.mjs --remote",
+    "dev": "npm run data && npm run db:local && astro dev",
+    "build": "npm run data && astro build",
+    "preview": "npm run build && npm run db:local && wrangler dev",
+    "deploy": "npm run build && npm run db:remote && wrangler deploy"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.4.8",
+    "astro": "^7.4.12"
+  },
+  "devDependencies": {
+    "hyparquet": "^1.33.0",
+    "pinyin-pro": "^3.29.5",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.162.0"
+  }
+}

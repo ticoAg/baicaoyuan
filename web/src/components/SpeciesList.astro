@@ -1,0 +1,19 @@
+---
+// 物种列表。items: [id, 中文名|0, 学名, 等级代码, …可选的附注]
+import { LEVEL_CODES } from '../lib/shared.js';
+import Level from './Level.astro';
+interface Props { items: any[][]; extraIndex?: number; flat?: boolean }
+const { items, extraIndex, flat = false } = Astro.props;
+---
+<ul class:list={["species-list", { flat }]}>
+  {items.map((it) => (
+    <li data-f={`${it[1] || ''} ${it[2]}`.toLowerCase()}>
+      <a href={`/s/${it[0]}`}>
+        <Level level={LEVEL_CODES[it[3]]} glyphOnly />
+        {it[1] ? <span class="zh">{it[1]}</span> : <span class="zh only-sci">{it[2]}</span>}
+        {it[1] ? <span class="sci">{it[2]}</span> : null}
+        {extraIndex != null && it[extraIndex] ? <span class="extra">{it[extraIndex]}</span> : null}
+      </a>
+    </li>
+  ))}
+</ul>

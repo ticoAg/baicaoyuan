@@ -1,0 +1,83 @@
+---
+import Base from '../layouts/Base.astro';
+import Level from '../components/Level.astro';
+import sources from '../generated/sources.json';
+import stats from '../generated/stats.json';
+import { LEVELS, SITE } from '../lib/shared.js';
+const role: Record<string, string> = {
+  wcvp: '学名、异名归并、科属、生活型、分布',
+  wikidata: '中文名与别名、科属中文名、蘑菇的可食性与形态',
+  taicol: '中文名与别名（繁体转简体）、真菌中文名',
+  cn_useful: '用途记录，逐条带文献；中文名',
+  wcfp: '食用、药用等用途标记；栽培标记；红色名录等级',
+  tw_fda: '监管口径的可食部位；未确认安全性的原料',
+  tppt: '有毒部位、对人毒性分级、毒素',
+  cn_toxic_1997: '有毒植物名单（由图书识别而来，只有物种名）',
+  xsbn: '部位、用途、加工方法（尚未入库）',
+  commons: '图片',
+};
+---
+<Base title="关于" current="/about/">
+  <div class="wrap">
+    <h1 class="page-title">关于百草园</h1>
+    <div class="prose">
+      <p class="lead">一本开源的中文植物与真菌图鉴，回答三个问题：这是什么、能不能吃、怎么处理。</p>
+
+      <h2>现在到哪一步了</h2>
+      <p>现在是骨架阶段。{stats.plants.toLocaleString('zh-CN')} 种植物和 {stats.fungi.toLocaleString('zh-CN')} 种真菌的名称、分类、分布、用途标记和毒性记录，全部由开放数据自动合并而来，没有经过人工审核。</p>
+      <p>还没有的：按部位的处理方法、易混淆物种的对照、栽培方法、中毒症状与急救。这些没有现成的开放数据，要从文献里逐条整理。</p>
+
+      <h2>安全结论怎么来的</h2>
+      <ul>
+        <li><strong>取最严。</strong>任何一个来源记载有毒，就按有毒显示，同时列出持相反说法的来源。</li>
+        <li><strong>有食用记录不等于可食。</strong>WCFP 把钩吻（断肠草，剧毒）标成了食用植物，因为某处文献记载过食用。食用标记只能把"未知"变成"有食用记录"。</li>
+        <li><strong>名称兜底。</strong>开放数据里中国有毒植物的记录很不全，钩吻就没有毒性记录。中文名或别名里带「毒」「断肠」等字样的，标为"可能有毒"。</li>
+        <li><strong>未知按不可食显示。</strong>页面上写"不要吃"，不留白。</li>
+        <li><strong>可食需要人工审核。</strong>"可食""处理后可食""少量"这三档，只有人工审核过的词条才能给出。现在还没有。</li>
+      </ul>
+      <p>所以，番茄会显示为"有毒"（TPPT 记载全株含茄碱类毒素），同时注明另有食用记录。这在审核完成之前是有意为之：宁可多提醒，不漏掉一种真有毒的。</p>
+    </div>
+
+    <section class="section">
+      <h2>等级</h2>
+      <ul class="legend">
+        {Object.entries(LEVELS).map(([k, lv]) => <li><Level level={k} /><span>{lv.hint}</span></li>)}
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>数据来源</h2>
+      <div class="table-scroll">
+        <table class="data">
+          <thead><tr><th>来源</th><th>用在哪里</th><th>许可</th><th>版本</th></tr></thead>
+          <tbody>
+            {sources.map((s) => (
+              <tr>
+                <td><a href={s.url} rel="noopener">{s.title}</a>{s.citation && <><br /><span class="muted small">{s.citation}</span></>}</td>
+                <td>{role[s.id] ?? ''}</td>
+                <td style="white-space:nowrap">{s.license}</td>
+                <td class="small">{s.version}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="note">每个来源的地址、许可原文和实测情况，登记在仓库的 <a href={`${SITE.repo}/blob/main/docs/sources.md`} rel="noopener">docs/sources.md</a>。只使用开放许可（CC0、CC BY、CC BY-SA、政府开放授权）的数据；非商业、禁止演绎的来源不进入发布数据。</p>
+    </section>
+
+    <div class="prose">
+      <h2>数据怎么拿</h2>
+      <ul>
+        <li>每个物种一份 JSON：在物种页地址后面加 <code>.json</code>，例如 <a href="/s/Portulaca_oleracea.json">/s/Portulaca_oleracea.json</a>。</li>
+        <li>全量数据是仓库里 <a href={`${SITE.repo}/tree/main/data/snapshot`} rel="noopener">data/snapshot</a> 下的 Parquet 表：物种、中文名、分布、用途、部位、毒性、来源。</li>
+        <li>每条记录保留其来源的许可，见上表；使用时请按来源署名。</li>
+      </ul>
+
+      <h2>纠错与贡献</h2>
+      <p>每个物种页底部都有"纠错"，会跳到预先填好的 issue。数据管线、网站代码和文档都在 <a href={SITE.repo} rel="noopener">GitHub</a> 上。</p>
+
+      <h2>免责</h2>
+      <p>野外采食有风险。本站内容不能替代专业鉴定，也不是医疗建议。无法确认的物种一律不要食用；疑似中毒请立即就医，并保留样本。</p>
+    </div>
+  </div>
+</Base>

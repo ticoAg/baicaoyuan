@@ -1,0 +1,28 @@
+---
+import Base from '../../../layouts/Base.astro';
+import taxonomy from '../../../generated/taxonomy.json';
+export function getStaticPaths() {
+  return taxonomy.map((f) => ({ params: { family: f.name }, props: { f } }));
+}
+const { f } = Astro.props;
+const total = f.genera.reduce((a, g) => a + g.species.length, 0);
+const title = f.zh ?? f.name;
+---
+<Base title={title} current="/t/" description={`${title}（${f.name}）：${f.genera.length} 属 ${total} 种。`}>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="位置"><a href="/t/">分类</a><span aria-hidden="true">›</span>{f.k === 'fungus' ? '真菌' : '维管植物'}</nav>
+    <h1 class="page-title">{f.zh ?? <i class="sci">{f.name}</i>}</h1>
+    <p class="lead">{f.zh && <span>{f.name} · </span>}{f.genera.length} 属 {total} 种</p>
+    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="筛选属名" aria-label="筛选属名" /></p>
+    <section class="section">
+      <ul class="fam-index">
+        {f.genera.map((g) => (
+          <li data-f={`${g.zh ?? ''} ${g.name}`.toLowerCase()}>
+            <a href={`/t/${f.name}/${g.name}/`}>{g.zh ?? <i class="sci">{g.name}</i>} {g.zh && <i class="sci muted small">{g.name}</i>}</a>
+            <span class="n">{g.species.length}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</Base>
