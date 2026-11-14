@@ -1,6 +1,6 @@
 // data/snapshot/*.parquet → 网站用的数据
 //
-//   public/data/s/{分片}.json   物种详情，按 id 的哈希分成 1024 片，物种页按需读取
+//   .data/species.ndjson        物种详情，一行一个物种；由 scripts/db-sync.mjs 灌进 D1
 //   public/data/search.json     浏览器内搜索索引
 //   src/generated/*.json        预渲染页面（分类、专题、关于）在构建时读取
 //
@@ -12,12 +12,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { asyncBufferFromFile, parquetReadObjects } from 'hyparquet';
 import { polyphonic } from 'pinyin-pro';
-import { LEVEL_CODES, LEVELS, shardOf } from '../src/lib/shared.js';
+import { LEVEL_CODES, LEVELS } from '../src/lib/shared.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.BCY_DATA_DIR ? path.resolve(process.env.BCY_DATA_DIR) : path.resolve(WEB, '../data/snapshot');
 const PUB = path.join(WEB, 'public/data');
 const GEN = path.join(WEB, 'src/generated');
+const OUT = path.join(WEB, '.data');
 
 if (!existsSync(path.join(DATA, 'taxa.parquet'))) {
   console.error(`找不到数据：${DATA}/taxa.parquet。先运行 pipeline（见 pipeline/README.md），或设置 BCY_DATA_DIR。`);
@@ -49,7 +50,7 @@ const G = {
 };
 
 // ── 物种详情 ────────────────────────────────────────────────────────
-const shards = new Map();
+const docs = [];
 const briefs = [];
 for (const t of taxa) {
   const id = t.id;
@@ -94,25 +95,17 @@ for (const t of taxa) {
     traits: (G.traits.get(id) ?? []).map((x) => [x.trait, x.value]),
     img: img && compact({ file: img.file, author: img.author, license: img.license, licenseUrl: img.license_url }),
   });
-  const s = shardOf(id);
-  if (!shards.has(s)) shards.set(s, {});
-  shards.get(s)[id] = doc;
+  docs.push(JSON.stringify(doc));
   briefs.push({ id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, hasImg: !!img });
 }
 
 await rm(PUB, { recursive: true, force: true });
-await mkdir(path.join(PUB, 's'), { recursive: true });
+await mkdir(PUB, { recursive: true });
 await mkdir(GEN, { recursive: true });
-let shardBytes = 0;
-let shardMax = 0;
-await Promise.all(
-  [...shards].map(([s, docs]) => {
-    const body = JSON.stringify(docs);
-    shardBytes += body.length;
-    shardMax = Math.max(shardMax, body.length);
-    return writeFile(path.join(PUB, 's', `${s}.json`), body);
-  }),
-);
+await mkdir(OUT, { recursive: true });
+const docBytes = docs.reduce((n, d) => n + d.length, 0);
+const docMax = docs.reduce((n, d) => Math.max(n, d.length), 0);
+await writeFile(path.join(OUT, 'species.ndjson'), docs.join('\n') + '\n');
 
 // ── 搜索索引 ────────────────────────────────────────────────────────
 // 一行一个物种：[学名, 中文名, 别名（| 分隔）, 科, 等级, 界]。有内容的排前面。
@@ -241,6 +234,6 @@ await writeFile(path.join(GEN, 'sources.json'), JSON.stringify(sources));
 
 const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(
-  `数据：${briefs.length} 个物种 → ${shards.size} 片（共 ${mb(shardBytes)}，最大 ${(shardMax / 1e3).toFixed(0)} KB），` +
+  `数据：${briefs.length} 个物种（共 ${mb(docBytes)}，最大 ${(docMax / 1e3).toFixed(0)} KB），` +
     `搜索索引 ${mb(searchBody.length)}，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
 );

@@ -12,4 +12,5 @@ web/.astro/
 web/.wrangler/
 web/src/generated/
 web/public/data/
+web/.data/
 .DS_Store

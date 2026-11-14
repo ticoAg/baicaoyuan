@@ -36,7 +36,9 @@ jobs:
           n=$(find dist/client -type f | wc -l)
           echo "静态文件 $n 个"
           test "$n" -lt 19000
-      # 只在 main 上、且仓库配置了 Cloudflare 凭据时部署
-      - name: 部署到 Cloudflare Workers
+      # 只在 main 上、且仓库配置了 Cloudflare 凭据时部署：先把数据增量同步到 D1，再发布代码
+      - name: 同步数据并部署到 Cloudflare Workers
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != ''
-        run: npx wrangler deploy
+        run: |
+          npm run db:remote
+          npx wrangler deploy

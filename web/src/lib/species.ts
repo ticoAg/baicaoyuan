@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { LEVELS, shardOf } from './shared.js';
+import { LEVELS } from './shared.js';
 
 export interface PartRow { part?: string; v: string; use?: string; note?: string; src: string; ref?: string }
 export interface HazardRow { lv?: string; part?: string; label: string; note?: string; toxins?: string; src: string; ref?: string }
@@ -16,19 +16,27 @@ export interface Species {
   img?: { file: string; author: string; license: string; licenseUrl?: string };
 }
 
-/** 物种数据按 id 的哈希分片存成静态文件，Worker 通过 ASSETS 读取。 */
-export async function loadSpecies(id: string, base: URL): Promise<Species | null> {
+/** 物种数据在 D1 里，一个物种一行 JSON。数据库出错时抛出，由页面返回 503。 */
+export async function loadSpecies(id: string): Promise<Species | null> {
   if (!/^[A-Za-z0-9_-]{3,90}$/.test(id)) return null;
-  const res = await env.ASSETS.fetch(new URL(`/data/s/${shardOf(id)}.json`, base));
-  if (!res.ok) return null;
-  const docs = (await res.json()) as Record<string, Species>;
-  return docs[id] ?? null;
+  const row = await env.DB.prepare('SELECT doc FROM species WHERE id = ?1').bind(id).first<{ doc: string }>();
+  return row ? (JSON.parse(row.doc) as Species) : null;
+}
+
+/** 数据库读不到（没灌数据、超出每日额度、故障）时的回应。 */
+export function unavailable(err: unknown, json = false): Response {
+  console.error('D1 读取失败', err);
+  const headers = { 'cache-control': 'no-store', 'retry-after': '60' };
+  if (json) return Response.json({ error: 'unavailable' }, { status: 503, headers });
+  return new Response('数据暂时读不到，请稍后再试。', { status: 503, headers: { ...headers, 'content-type': 'text/plain; charset=utf-8' } });
 }
 
 /** 预渲染好的 404 页，带上 404 状态码返回。 */
 export async function notFound(base: URL): Promise<Response> {
   const page = await env.ASSETS.fetch(new URL('/404.html', base));
-  return new Response(page.body, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
+  // 开发模式下没有预渲染的 404 页
+  const body = page.ok ? page.body : '没有找到这一页';
+  return new Response(body, { status: 404, headers: { 'content-type': `${page.ok ? 'text/html' : 'text/plain'}; charset=utf-8` } });
 }
 
 export const SOURCE_SHORT: Record<string, string> = {

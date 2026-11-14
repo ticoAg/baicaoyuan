@@ -1,23 +1,29 @@
 ---
 // 物种页：结论在最上面，证据在最下面，中间按"人会问的顺序"排。
-// 由 Worker 按需渲染（见 astro.config.mjs 的说明）。
+// 由 Worker 按需渲染，数据来自 D1。
 import Base from '../../layouts/Base.astro';
 import Level from '../../components/Level.astro';
 import sources from '../../generated/sources.json';
 import { glyphSvg, PROVINCE_TILES, REGIONS, SITE } from '../../lib/shared.js';
-import { loadSpecies, notFound, REDLIST, src, verdict } from '../../lib/species';
+import { loadSpecies, notFound, REDLIST, src, unavailable, verdict } from '../../lib/species';
 
 export const prerender = false;
 
 const id = Astro.params.id ?? '';
-const sp = await loadSpecies(id, Astro.url);
-if (!sp) {
-  // 大小写、空格写法不同的，转到规范地址
-  const fixed = id.replace(/[\s+]+/g, '_').replace(/^./, (c) => c.toUpperCase());
-  if (fixed !== id && (await loadSpecies(fixed, Astro.url))) return Astro.redirect(`/s/${fixed}`, 301);
-  return notFound(Astro.url);
+let sp;
+try {
+  sp = await loadSpecies(id);
+  if (!sp) {
+    // 大小写、空格写法不同的，转到规范地址
+    const fixed = id.replace(/[\s+]+/g, '_').replace(/^./, (c) => c.toUpperCase());
+    if (fixed !== id && (await loadSpecies(fixed))) return Astro.redirect(`/s/${fixed}`, 301);
+    return notFound(Astro.url);
+  }
+} catch (err) {
+  return unavailable(err);
 }
-Astro.response.headers.set('Cache-Control', 'public, max-age=600, s-maxage=86400, stale-while-revalidate=604800');
+// 浏览器缓存 10 分钟；边缘缓存 1 小时（见 src/middleware.ts），所以数据更新后最多一小时生效
+Astro.response.headers.set('Cache-Control', 'public, max-age=600, s-maxage=3600');
 
 const fungus = sp.k === 'fungus';
 const title = sp.zh ?? sp.sci;

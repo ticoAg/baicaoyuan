@@ -1,17 +1,5 @@
 // 构建脚本（Node）和运行时（Worker、浏览器）共用的常量与小函数。
 
-export const SHARDS = 1024;
-
-/** 物种 id → 数据分片名。FNV-1a 32 位。 */
-export function shardOf(id) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return ((h >>> 0) % SHARDS).toString(16).padStart(3, '0');
-}
-
 /** 学名 → 物种 id（与 pipeline/build.py 的 slug 一致）。 */
 export function slugOf(sci) {
   return sci.replace(/×/g, 'x').replace(/\+/g, '').trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
