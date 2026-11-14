@@ -18,15 +18,17 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 | 首页、专题、分类（科、属）、关于 | 构建时预渲染成静态文件 |
 | 物种页 `/s/{id}`、物种 JSON `/s/{id}.json` | Worker 按需渲染，数据读 D1，结果进边缘缓存 |
 | 搜索 | 浏览器里做，索引是一个静态文件 `/data/search.json` |
+| 首页的随机物种 | 浏览器里做：随机取一个 `/data/featured/{n}.json`（200 种），从里面挑 9 种 |
 
 ## 数据
 
-`npm run data`（`scripts/build-data.mjs`）把 `../data/snapshot/*.parquet` 转成三样东西：
+`npm run data`（`scripts/build-data.mjs`）把 `../data/snapshot/*.parquet` 转成四样东西：
 
 | 产物 | 去向 |
 |---|---|
 | `.data/species.ndjson` | 物种详情，一行一个物种，由 `scripts/db-sync.mjs` 灌进 D1 |
 | `public/data/search.json` | 搜索索引，随站点发布 |
+| `public/data/featured/*.json` | 有中文名、有图的物种，打乱后每 200 种一个文件，随站点发布 |
 | `src/generated/*.json` | 分类、专题、统计，预渲染时读取 |
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。

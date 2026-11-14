@@ -27,7 +27,7 @@ import re
 import tempfile
 import unicodedata
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import duckdb
 import openpyxl
@@ -708,7 +708,59 @@ class Build:
                 url = f"https://creativecommons.org/licenses/{cc.group(1).lower()}/{cc.group(2)}/"
             kept.append({**img, "author": re.sub(r"\s+", " ", author or "佚名")[:80], "license": short, "license_url": url})
         print(f"图片：{len(self.images)} 张里 {len(kept)} 张有开放许可和作者")
+        for img in kept:
+            f = quote(img["file"], safe="")
+            img["url"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{f}?width=960"
+            img["thumb"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{f}?width=500"
+            img["page"] = f"https://commons.wikimedia.org/wiki/File:{f}"
         self.images = kept
+
+    def inat_images(self) -> None:
+        """没有 Commons 配图的物种，用 iNaturalist 上开放许可的物种照片补。图片只记链接，不转存。"""
+        taxa_file, photo_file = RAW / "inat_taxa.csv.gz", RAW / "inat_photos.json"
+        if not taxa_file.exists():
+            print("iNaturalist：没有 inat_taxa.csv.gz，跳过")
+            return
+        rows = self.con.sql(f"""
+            select taxon_id, name, ancestry like '48460/47170/%' as fungus
+            from read_csv('{taxa_file}', delim='\t', header=true, all_varchar=true)
+            where rank = 'species' and active = 'true'
+              and (ancestry like '48460/47126/%' or ancestry like '48460/47170/%')
+        """).fetchall()
+        plants = self.plant_ids({name for _, name, fungus in rows if not fungus})
+        match: dict[str, tuple] = {}
+        for inat_id, name, fungus in rows:
+            tid = slug(name) if fungus else plants.get(name)
+            t = self.taxa.get(tid) if tid else None
+            if not t or (t["kingdom"] == "fungus") != fungus:
+                continue
+            # 同一个接受种对上多个 iNaturalist 物种（异名）时，取学名一致的
+            key = (name != t["sci"], int(inat_id))
+            if tid not in match or key < match[tid][0]:
+                match[tid] = (key, inat_id)
+        cand = {tid: m[1] for tid, m in sorted(match.items())}
+        # 候选清单留给 inat.py 取照片
+        (RAW / "inat_candidates.json").write_text(json.dumps(cand))
+        if not photo_file.exists():
+            print(f"iNaturalist：对上 {len(cand)} 种；没有 inat_photos.json（运行 inat.py 后再构建一次）")
+            return
+        photos = json.loads(photo_file.read_text())
+        have = {i["taxon_id"] for i in self.images}
+        n = 0
+        for tid, inat_id in cand.items():
+            ps = photos.get(inat_id)
+            if tid in have or not ps:
+                continue
+            p = ps[0]
+            name, url = vocab.INAT_LICENSE[p["license"]]
+            base = f"https://inaturalist-open-data.s3.amazonaws.com/photos/{p['id']}"
+            self.images.append({
+                "taxon_id": tid, "file": None, "author": re.sub(r"\s+", " ", p["author"])[:80], "license": name,
+                "license_url": url, "source": "inat", "url": f"{base}/large.{p['ext']}",
+                "thumb": f"{base}/medium.{p['ext']}", "page": f"https://www.inaturalist.org/photos/{p['id']}",
+            })
+            n += 1
+        print(f"iNaturalist：对上 {len(cand)} 种，补了 {n} 张图；共 {len(self.images)} 种有图")
 
     # ── 安全等级 ─────────────────────────────────────────────────────
     def grade(self) -> None:
@@ -756,6 +808,7 @@ class Build:
         self.suspect_by_name(name_rows)
         self.rank_names(primary)
         self.license_images()
+        self.inat_images()
         self.grade()
         for tid, t in self.taxa.items():
             t["zh"] = primary.get(tid)
@@ -775,7 +828,7 @@ class Build:
         self.table("parts", self.parts, {"taxon_id": V, "part": V, "verdict": V, "use": V, "note": V, "source": V, "reference": V}, "taxon_id, part")
         self.table("hazards", self.hazards, {"taxon_id": V, "level": V, "part": V, "label": V, "note": V, "toxins": V, "source": V, "reference": V}, "taxon_id, source")
         self.table("traits", self.traits, {"taxon_id": V, "trait": V, "value": V, "source": V}, "taxon_id, trait")
-        self.table("images", self.images, {"taxon_id": V, "file": V, "author": V, "license": V, "license_url": V, "source": V}, "taxon_id")
+        self.table("images", self.images, {"taxon_id": V, "url": V, "thumb": V, "page": V, "file": V, "author": V, "license": V, "license_url": V, "source": V}, "taxon_id")
         self.table("sources", [s.__dict__ for s in SOURCES], {"id": V, "title": V, "license": V, "url": V, "version": V, "citation": V}, "id")
 
         con = self.con
