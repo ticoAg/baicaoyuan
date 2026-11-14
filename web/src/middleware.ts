@@ -1,4 +1,4 @@
-// 物种页、物种 JSON 和上传图片的边缘缓存。
+// 物种页和物种 JSON 的边缘缓存。
 //
 // 用 Cache API：命中时不读数据库、不渲染。它只在自定义域名上生效（workers.dev 上是空操作）；
 // 而且命中时 Worker 仍会执行，所以省的是 D1 读取和 CPU，不是请求次数。
@@ -8,7 +8,7 @@ import { defineMiddleware } from 'astro:middleware';
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { request, url } = context;
-  if (request.method !== 'GET' || !(url.pathname.startsWith('/s/') || url.pathname.startsWith('/img/'))) return next();
+  if (request.method !== 'GET' || !url.pathname.startsWith('/s/')) return next();
 
   const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
   if (!cache) return next();

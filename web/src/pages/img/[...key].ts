@@ -1,4 +1,4 @@
-// 后台上传的图片，存在 R2。文件名带内容哈希，所以可以一直缓存（边缘缓存见 src/middleware.ts）。
+// 后台上传的图片，存在 R2。文件名带内容哈希，浏览器可以一直缓存；不进边缘缓存，删掉的图马上读不到。
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 
