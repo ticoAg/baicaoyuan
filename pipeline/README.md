@@ -6,8 +6,9 @@
 cd pipeline
 uv sync
 uv run python fetch.py     # 下载原始数据到 data/raw/（约 350 MB，不入库）
-uv run python images.py    # 给配图补作者与许可（可跳过，跳过则本次不带图片）
 uv run python build.py     # 合并，输出 data/snapshot/
+uv run python images.py    # 给配图查作者与许可（端点限流，全量约一小时；可跳过）
+uv run python build.py     # 带上图片再合并一次
 ```
 
 | 文件 | 作用 |

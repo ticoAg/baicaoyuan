@@ -677,8 +677,10 @@ class Build:
     def license_images(self) -> None:
         """只保留开放许可、且查得到作者的图片（公有领域的可以没有作者）。"""
         meta_file, label_file = RAW / "commons_meta.json", RAW / "commons_labels.json"
+        # 候选清单留给 images.py 查作者与许可
+        (RAW / "image_candidates.json").write_text(json.dumps(sorted({i["file"] for i in self.images}), ensure_ascii=False))
         if not meta_file.exists():
-            print("图片：没有 commons_meta.json（先运行 images.py），本次不带图片")
+            print("图片：没有 commons_meta.json（运行 images.py 后再构建一次），本次不带图片")
             self.images = []
             return
         meta = json.loads(meta_file.read_text())

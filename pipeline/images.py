@@ -13,11 +13,10 @@ import time
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-import duckdb
 import requests
 
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
-SNAPSHOT = RAW.parent / "snapshot"
+CANDIDATES = RAW / "image_candidates.json"
 OUT = RAW / "commons_meta.json"
 UA = {"User-Agent": "baicaoyuan-pipeline/0.1 (https://github.com/ticoAg/baicaoyuan)", "Accept": "application/sparql-results+json"}
 COMMONS = "https://qlever.dev/api/wikimedia-commons"
@@ -57,7 +56,14 @@ def sparql(endpoint: str, query: str) -> list[dict]:
     """限流（429）时等一等再试；查询本身出错（5xx）时抛出，由调用方拆小。"""
     waited = 0
     while True:
-        r = requests.post(endpoint, data={"query": query}, headers=UA, timeout=180)
+        try:
+            r = requests.post(endpoint, data={"query": query}, headers=UA, timeout=180)
+        except requests.RequestException:  # 断线：等一等再试
+            if waited >= 900:
+                raise
+            waited += 20
+            time.sleep(20)
+            continue
         if r.status_code == 429 and waited < 900:
             pause = min(int(r.headers.get("Retry-After", 30)), 120)
             waited += pause
@@ -69,9 +75,10 @@ def sparql(endpoint: str, query: str) -> list[dict]:
 
 
 def main() -> None:
-    # 只查发布数据里用到的图片
-    con = duckdb.connect()
-    files = [r[0] for r in con.sql(f"select distinct file from '{SNAPSHOT}/images.parquet'").fetchall()]
+    # 候选清单由 build.py 写出：Wikidata 上各物种的配图
+    if not CANDIDATES.exists():
+        raise SystemExit("没有 data/raw/image_candidates.json，先运行一次 build.py")
+    files = json.loads(CANDIDATES.read_text())
     urls = sorted("<http://commons.wikimedia.org/wiki/Special:FilePath/" + quote(f, safe="") + ">" for f in files)
     meta: dict[str, dict] = json.loads(OUT.read_text()) if OUT.exists() else {}
     todo = [u for u in urls if name_of(u) not in meta]
