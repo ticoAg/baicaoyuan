@@ -692,13 +692,16 @@ class Build:
             name = lic.get("spdx") or lic.get("label") or ""
             public_domain = m.get("status") == "Q19652" or name.startswith("CC0") or "public domain" in name.lower()
             open_cc = bool(re.match(r"^(CC-BY(-SA)?-\d|CC0|Creative Commons (Attribution|CC0|Zero))", name)) and not re.search(r"NC|ND|NonCommercial|NoDeriv", name)
+            # 许可和"公有领域"状态对不上的（如标了 GFDL 又标公有领域）、说法含糊的，都不收
+            if name and not open_cc and not (name.startswith("CC0") or "public domain" in name.lower()):
+                continue
             if not (public_domain or open_cc):
                 continue
             author = m.get("author") or labels.get(m.get("creator", ""), {}).get("label")
             if not author and not public_domain:
                 continue
             short = re.sub(r"^CC-?(BY(?:-SA)?|0)-", lambda x: "CC0 " if x.group(1) == "0" else f"CC {x.group(1)} ", name) if lic.get("spdx") else name
-            if not name and public_domain:
+            if public_domain and not open_cc and not name.startswith("CC0"):
                 short = "公有领域"
             url = lic.get("url")
             if not url and (cc := re.match(r"^CC-(BY(?:-SA)?)-(\d\.\d)", name)):
@@ -732,7 +735,7 @@ class Build:
             for r in rows:
                 f.write(json.dumps({k: r.get(k) for k in columns}, ensure_ascii=False) + "\n")
         cols = ", ".join(f"'{k}': '{v}'" for k, v in columns.items())
-        self.con.execute(f"create or replace table {name} as select * from read_json('{p}', format='newline_delimited', columns={{{cols}}}) order by {order}")
+        self.con.execute(f"create or replace table {name} as select * from read_json('{p}', format='newline_delimited', columns={{{cols}}}) order by {order}, {", ".join(f'"{c}"' for c in columns)}")
         self.con.execute(f"copy {name} to '{OUT}/{name}.parquet' (format parquet, compression snappy)")
         size = (OUT / f"{name}.parquet").stat().st_size
         print(f"  {name:8s} {len(rows):>7,d} 行  {size / 1e6:5.2f} MB")
