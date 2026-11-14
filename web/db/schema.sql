@@ -18,3 +18,12 @@ CREATE TABLE IF NOT EXISTS usage (
   n   INTEGER NOT NULL,
   PRIMARY KEY (day, who)
 ) WITHOUT ROWID;
+
+-- 后台维护的改动，一个物种一行，不随数据同步覆盖。
+-- patch 是覆盖在物种详情上的字段（值为 null 表示去掉该字段）；created = 1 的是后台新建的词条，patch 就是整份详情。
+CREATE TABLE IF NOT EXISTS edits (
+  id      TEXT PRIMARY KEY,
+  patch   TEXT NOT NULL,
+  created INTEGER NOT NULL DEFAULT 0,
+  updated TEXT NOT NULL
+) WITHOUT ROWID;

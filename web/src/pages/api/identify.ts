@@ -6,7 +6,8 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { slugOf } from '../../lib/shared.js';
-import type { Species } from '../../lib/species';
+import { loadMany, type Species } from '../../lib/species';
+import { bump, today, used, visitor } from '../../lib/usage';
 
 export const prerender = false;
 
@@ -32,14 +33,10 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 
 /** 当天还能不能识别；能的话顺手记一次。超限时不写库。 */
 async function admit(day: string, who: string): Promise<boolean> {
-  const { results } = await env.DB.prepare(`SELECT who, n FROM usage WHERE day = ?1 AND who IN (?2, '*')`).bind(day, who).all<{ who: string; n: number }>();
-  const used = (w: string) => results.find((r) => r.who === w)?.n ?? 0;
-  if (used(who) >= PER_VISITOR || used('*') >= SITE_TOTAL) return false;
-  const bump = env.DB.prepare('INSERT INTO usage (day, who, n) VALUES (?1, ?2, 1) ON CONFLICT (day, who) DO UPDATE SET n = n + 1');
-  const batch = [bump.bind(day, who), bump.bind(day, '*')];
+  const n = await used(day, [who, '*']);
+  if ((n.get(who) ?? 0) >= PER_VISITOR || (n.get('*') ?? 0) >= SITE_TOTAL) return false;
   // 当天第一次识别时清掉往日的行
-  if (!used('*')) batch.push(env.DB.prepare('DELETE FROM usage WHERE day < ?1').bind(day));
-  await env.DB.batch(batch);
+  await bump(day, [who, '*'], !n.has('*'));
   return true;
 }
 
@@ -81,10 +78,8 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
   const body = await request.arrayBuffer();
   if (!body.byteLength || body.byteLength > MAX_BYTES) return json({ error: 'bad_image' }, 413);
 
-  const day = new Date().toISOString().slice(0, 10);
-  const ip = request.headers.get('cf-connecting-ip') ?? clientAddress ?? '';
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${day}|${ip}`));
-  const who = [...new Uint8Array(digest).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const day = today();
+  const who = await visitor(request, clientAddress, day);
 
   try {
     if (!(await admit(day, who))) return json({ error: 'quota' }, 429);
@@ -112,17 +107,11 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
   const found = ((await res.json()) as { results?: PlantNetResult[] }).results ?? [];
   const top = found.filter((r) => r.species?.scientificNameWithoutAuthor).slice(0, CANDIDATES);
   const ids = top.map((r) => slugOf(r.species.scientificNameWithoutAuthor));
-  const known = new Map<string, Species>();
-  if (ids.length) {
-    try {
-      const { results } = await env.DB.prepare(`SELECT doc FROM species WHERE id IN (${ids.map((_, i) => `?${i + 1}`).join(', ')})`).bind(...ids).all<{ doc: string }>();
-      for (const row of results) {
-        const sp = JSON.parse(row.doc) as Species;
-        known.set(sp.id, sp);
-      }
-    } catch (err) {
-      console.error('D1 读取失败', err);
-    }
+  let known = new Map<string, Species>();
+  try {
+    known = await loadMany(ids);
+  } catch (err) {
+    console.error('D1 读取失败', err);
   }
 
   return json({

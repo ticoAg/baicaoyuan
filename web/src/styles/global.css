@@ -336,6 +336,48 @@ a.cand:hover { background: var(--accent-wash); }
 .cand.unknown .cand-name { color: var(--ink-2); }
 .identify-note { margin-top: 2rem; max-width: 46rem; }
 
+/* 维护后台 */
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 2.5rem; padding: 0 1.1rem; font: 600 0.94rem var(--sans); color: var(--accent-ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.btn:hover { border-color: var(--accent); background: var(--accent-wash); }
+.btn.primary { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-ink); }
+.btn.danger { color: var(--toxic); }
+.btn.danger:hover { border-color: var(--toxic); background: var(--toxic-wash); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.form-msg { margin: 0; font-size: 0.9rem; color: var(--toxic); }
+.admin input:not([type='radio'], [type='file'], [type='search']), .admin select { width: 100%; height: 2.5rem; padding: 0 0.8rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
+.admin input:focus, .admin select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.admin-login { display: flex; flex-wrap: wrap; gap: 0.6rem; max-width: 24rem; margin-top: 1.2rem; }
+.admin-login input { flex: 1; }
+.admin-login .form-msg { flex-basis: 100%; }
+.admin-find { display: flex; gap: 0.6rem; max-width: 46rem; margin-top: 1.2rem; }
+.admin-find .search { margin: 0; max-width: none; }
+.admin-find .search input, .admin-find .btn { height: 3rem; }
+.admin .section > h2 .again { margin-left: auto; font: 500 0.86rem var(--sans); color: var(--accent-ink); background: none; border: 1px solid var(--rule); border-radius: 999px; padding: 0.2rem 0.9rem; cursor: pointer; }
+.admin-list { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
+.admin-list a { display: flex; align-items: baseline; gap: 0.7rem; padding: 0.6rem 0.3rem; border-bottom: 1px solid var(--rule-2); color: var(--ink); text-decoration: none; }
+.admin-list a:hover { background: var(--accent-wash); }
+.admin-list .zh { font-weight: 600; }
+.admin-list .sci { font-size: 0.9rem; color: var(--ink-3); }
+.admin-list .extra { margin-left: auto; font-size: 0.82rem; color: var(--ink-3); white-space: nowrap; }
+.edit { max-width: 46rem; margin-top: 1.4rem; display: grid; gap: 1.8rem; }
+.edit fieldset { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1.2rem; }
+.edit legend { font: 700 1.15rem var(--serif); padding: 0 0 0.45rem; margin-bottom: 0.9rem; width: 100%; border-bottom: 1px solid var(--rule); }
+.edit label { display: grid; gap: 0.3rem; font-size: 0.86rem; color: var(--ink-2); }
+.edit .wide { grid-column: 1 / -1; }
+.edit output { display: flex; align-items: center; height: 2.5rem; font-size: 1.05rem; color: var(--ink); }
+.edit input.sci { font-size: 1.02rem; }
+.edit .kinds { display: flex; gap: 1.5rem; }
+.edit .kinds label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.95rem; color: var(--ink); }
+.edit .credit { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1.2rem; }
+.edit .credit[hidden] { display: none; }
+.edit-photo { display: flex; gap: 1.2rem; align-items: flex-start; }
+.edit-photo img { width: 12rem; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius); background: var(--muted-wash); }
+.edit-photo img[hidden] { display: none; }
+.edit-photo .btn { display: inline-flex; margin: 0 0.5rem 0.6rem 0; color: var(--accent-ink); font-size: 0.94rem; }
+.edit-photo .note { margin: 0; }
+.edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
+
 /* 页脚 */
 .site-footer { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; font-size: 0.86rem; color: var(--ink-3); }
 .site-footer .wrap { display: grid; grid-template-columns: 1fr auto; gap: 1rem 3rem; }
@@ -376,6 +418,8 @@ a.cand:hover { background: var(--accent-wash); }
   .sp-head h1 { font-size: 2.1rem; }
   .page-title { font-size: 1.8rem; }
   .use { grid-template-columns: 1fr; }
+  .edit fieldset, .edit .credit { grid-template-columns: 1fr; }
+  .edit-photo { flex-direction: column; }
   .search kbd { display: none; }
   .shoot-link { width: 3.3rem; padding: 0; justify-content: center; flex: none; }
   .shoot-link span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

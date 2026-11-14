@@ -47,7 +47,7 @@ const rows = [
   ...parts.map((p) => ({ part: p.part, level: p.v, label: undefined as string | undefined, use: p.use ?? '', note: p.note, src: p.src, ref: p.ref })),
 ];
 const used = new Set<string>([
-  ...(sp.dist?.length ? ['wcvp'] : sp.k === 'plant' ? ['wcvp'] : []),
+  ...(sp.dist?.length ? ['wcvp'] : sp.k === 'plant' && !sp.manual ? ['wcvp'] : []),
   ...rows.map((r) => r.src),
   ...flags.flatMap((f) => f.src),
   ...(uses.length ? ['cn_useful'] : []),
@@ -110,8 +110,8 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
           <figure class="figure">
             <img src={sp.img.url} alt={`${title}的照片`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').hidden=true" />
             <figcaption>
-              图：{sp.img.author} · {sp.img.licenseUrl ? <a href={sp.img.licenseUrl} rel="license noopener">{sp.img.license}</a> : sp.img.license} ·{' '}
-              <a href={sp.img.page} rel="noopener">{sp.img.src === 'inat' ? 'iNaturalist' : 'Wikimedia Commons'}</a>
+              图：{sp.img.author} · {sp.img.licenseUrl ? <a href={sp.img.licenseUrl} rel="license noopener">{sp.img.license}</a> : sp.img.license}
+              {sp.img.page && <> · <a href={sp.img.page} rel="noopener">{sp.img.src === 'inat' ? 'iNaturalist' : sp.img.src === 'upload' ? '来源' : 'Wikimedia Commons'}</a></>}
             </figcaption>
           </figure>
         )}
@@ -183,7 +183,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
           </section>
         )}
 
-        {sp.k === 'plant' && (
+        {sp.k === 'plant' && !sp.manual && (
           <section class="section">
             <h2>哪里有</h2>
             {dist.size ? (
@@ -210,11 +210,14 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
 
         <section class="section">
           <h2>出处</h2>
-          <ol class="sources">
-            {usedSources.map((s) => (
-              <li><a href={s.url} rel="noopener">{s.title}</a>{s.version && <span class="muted">（{s.version}）</span>} · {s.license}</li>
-            ))}
-          </ol>
+          {usedSources.length > 0 && (
+            <ol class="sources">
+              {usedSources.map((s) => (
+                <li><a href={s.url} rel="noopener">{s.title}</a>{s.version && <span class="muted">（{s.version}）</span>} · {s.license}</li>
+              ))}
+            </ol>
+          )}
+          {sp.manual && <p>本站录入的词条。</p>}
           <p class="note">以上内容尚未经人工审核。发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
         </section>
       </article>
@@ -229,13 +232,13 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             <dt>类群</dt><dd>{fungus ? '真菌' : '维管植物'}</dd>
           </dl>
         </section>
-        {(sp.lf || sp.cl || sp.k === 'plant') && (
+        {(sp.lf || sp.cl || (sp.k === 'plant' && !sp.manual)) && (
           <section>
             <h2>习性</h2>
             <dl>
               {sp.lf && <><dt>生活型</dt><dd>{sp.lf}</dd></>}
               {sp.cl && <><dt>气候</dt><dd>{sp.cl}</dd></>}
-              {sp.k === 'plant' && <><dt>来历</dt><dd>{sp.nat ? '中国原生' : sp.cn ? '引入后归化' : '中国无野生分布记录'}{sp.cult && '，栽培作物'}</dd></>}
+              {sp.k === 'plant' && !sp.manual && <><dt>来历</dt><dd>{sp.nat ? '中国原生' : sp.cn ? '引入后归化' : '中国无野生分布记录'}{sp.cult && '，栽培作物'}</dd></>}
               {sp.rl && REDLIST[sp.rl] && <><dt>红色名录</dt><dd>{REDLIST[sp.rl]}（{sp.rl}）</dd></>}
             </dl>
           </section>
@@ -249,9 +252,13 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
           <ul>
             <li><a href={`/s/${sp.id}.json`}>JSON</a></li>
             <li><a href={issue} rel="noopener">纠错</a></li>
+            <li hidden data-admin-only><a href={`/admin/edit?id=${sp.id}`}>编辑</a></li>
           </ul>
         </section>
       </aside>
     </div>
   </div>
+  <script is:inline>
+    if (document.cookie.includes('bcy_m=1')) for (const el of document.querySelectorAll('[data-admin-only]')) el.hidden = false;
+  </script>
 </Base>

@@ -1,0 +1,91 @@
+---
+// 维护后台：新建或编辑一个词条的名称、类别和图片。
+import { env } from 'cloudflare:workers';
+import Base from '../../layouts/Base.astro';
+import { isAdmin, LICENSES, SESSION } from '../../lib/admin';
+import { applyPatch, notFound, validId, type Species } from '../../lib/species';
+
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'no-store');
+if (!(await isAdmin(Astro.cookies.get(SESSION)?.value))) return Astro.redirect('/admin/');
+
+const id = Astro.url.searchParams.get('id');
+let sp: Partial<Species> = { k: 'plant' };
+let edited = false;
+let created = !id;
+if (id) {
+  const row = validId(id)
+    ? await env.DB.prepare(
+        'SELECT (SELECT doc FROM species WHERE id = ?1) AS doc, (SELECT patch FROM edits WHERE id = ?1) AS patch, (SELECT created FROM edits WHERE id = ?1) AS created',
+      )
+        .bind(id)
+        .first<{ doc: string | null; patch: string | null; created: number | null }>()
+    : null;
+  const found = applyPatch(row?.doc ? (JSON.parse(row.doc) as Species) : null, row?.patch ?? null);
+  if (!found) return notFound(Astro.url);
+  sp = found;
+  edited = !!row?.patch;
+  created = !!row?.created;
+}
+const title = id ? (sp.zh ?? sp.sci) : '新建词条';
+const uploaded = sp.img?.src === 'upload';
+---
+<Base title={id ? `编辑 ${title}` : '新建词条'} headerSearch={false}>
+  <meta slot="head" name="robots" content="noindex" />
+  <div class="wrap admin">
+    <nav class="crumbs" aria-label="位置"><a href="/admin/">维护</a>{id && <><span aria-hidden="true">›</span><a href={`/s/${id}`}>{title}</a></>}</nav>
+    <h1 class="page-title">{id ? title : '新建词条'}</h1>
+
+    <form class="edit" data-edit data-id={id ?? ''}>
+      <fieldset>
+        <legend>名称</legend>
+        <label>学名
+          {id ? <output class="sci">{sp.sci}</output> : <input name="sci" class="sci" required placeholder="Toona sinensis" autocomplete="off" spellcheck="false" autofocus />}
+        </label>
+        <label>中文名<input name="zh" value={sp.zh ?? ''} autocomplete="off" /></label>
+        <label class="wide">别名<input name="alias" value={(sp.alias ?? []).join('、')} placeholder="用顿号或逗号分开" autocomplete="off" /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>类别</legend>
+        <div class="kinds wide">
+          <label><input type="radio" name="k" value="plant" checked={sp.k !== 'fungus'} />植物</label>
+          <label><input type="radio" name="k" value="fungus" checked={sp.k === 'fungus'} />真菌</label>
+        </div>
+        <label>科<input name="fam" class="sci" value={sp.fam ?? ''} list="families" placeholder="Meliaceae" autocomplete="off" spellcheck="false" /></label>
+        <label>科的中文名<input name="famZh" value={sp.famZh ?? ''} placeholder="楝科" autocomplete="off" /></label>
+        <label>属<input name="gen" class="sci" value={sp.gen ?? ''} placeholder="Toona" autocomplete="off" spellcheck="false" /></label>
+        <label>属的中文名<input name="genZh" value={sp.genZh ?? ''} placeholder="香椿属" autocomplete="off" /></label>
+        <datalist id="families"></datalist>
+      </fieldset>
+
+      <fieldset>
+        <legend>图片</legend>
+        <div class="edit-photo wide">
+          <img data-preview src={sp.img?.thumb} alt="" hidden={!sp.img} referrerpolicy="no-referrer" />
+          <div>
+            <label class="btn">{sp.img ? '换一张' : '选一张照片'}<input type="file" name="image" accept="image/*" class="visually-hidden" /></label>
+            {uploaded && <button type="button" class="btn" data-drop-image>去掉这张</button>}
+            <p class="note">只传自己拍的，或者许可允许转载的照片。</p>
+          </div>
+        </div>
+        <div class="credit wide" hidden={!uploaded}>
+          <label>作者<input name="author" value={uploaded ? sp.img!.author : ''} autocomplete="off" /></label>
+          <label>许可
+            <select name="license">{Object.keys(LICENSES).map((l) => <option selected={uploaded && sp.img!.license === l}>{l}</option>)}</select>
+          </label>
+          <label class="wide">来源链接<input name="page" type="url" value={(uploaded && sp.img!.page) || ''} placeholder="可不填" autocomplete="off" /></label>
+        </div>
+      </fieldset>
+
+      <div class="edit-actions">
+        <button class="btn primary">保存</button>
+        {id && edited && <button type="button" class="btn danger" data-remove>{created ? '删除词条' : '放弃全部改动'}</button>}
+        <p class="form-msg" role="alert"></p>
+      </div>
+    </form>
+  </div>
+  <script>
+    import '../../scripts/admin.ts';
+  </script>
+</Base>

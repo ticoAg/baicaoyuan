@@ -19,6 +19,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 | 物种页 `/s/{id}`、物种 JSON `/s/{id}.json` | Worker 按需渲染，数据读 D1，结果进边缘缓存 |
 | 搜索 | 浏览器里做，索引是一个静态文件 `/data/search.json` |
 | 首页的随机物种 | 浏览器里做：随机取一个 `/data/featured/{n}.json`（200 种），从里面挑 9 种 |
+| 维护后台 | `/admin/` 登录后新建词条、改名称和科属、上传图片。改动存在 D1 的 `edits` 表，图片存 R2 |
 | 拍照识别 | `/identify/` 把照片缩小后交给 `/api/identify`，Worker 转给 Pl@ntNet，再把候选学名对回 D1 里的物种 |
 
 ## 数据
@@ -34,7 +35,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
-D1 里有三张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记拍照识别当天的次数。同步脚本比对哈希，只写有变化的行：
+D1 里有四张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记拍照识别当天的次数，`edits` 是后台的改动。同步脚本比对哈希，只写有变化的行：
 
 ```bash
 npm run db:local     # 本地开发库，在 .wrangler/state 里
@@ -62,6 +63,16 @@ npm run db:remote    # 线上库
 
 D1 的额度是整个账号共用的，不是每个数据库各算各的。
 
+## 维护后台
+
+`/admin/` 用一个密码登录（Worker 的 secret `ADMIN_PASSWORD`，没设置时后台不可用）。能做的事：新建词条，改中文名和别名，改类型、科、属，上传一张图片。
+
+- 改动存在 `edits` 表，一个物种一行。已有的物种只存和数据不一样的字段，数据同步不会覆盖它，没改过的字段照常随数据更新；新建的词条整份存在这张表里。
+- 物种页和物种 JSON 在读取时合并改动，保存后马上生效（其他节点的边缘缓存最多一小时）。
+- 搜索索引是静态文件，改过的词条靠 `/api/overlay.json` 在浏览器里补上。
+- 分类页、专题、首页的随机物种是预渲染的，下次部署时由 `scripts/build-data.mjs` 并入改动。
+- 图片在浏览器里缩成 1600 和 500 两个尺寸，存进 R2 的 `baicaoyuan-images`，由 `/img/…` 读出。上传的图要写作者和许可。
+
 ## 部署
 
 线上地址 <https://plants.ticoag.fun>，域名写在 `wrangler.jsonc` 的 `routes` 里。
@@ -74,7 +85,7 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 | 构建命令 | `npm run build` |
 | 部署命令 | `npm run db:remote && npx wrangler deploy` |
 
-构建用的凭据要有 D1 的编辑权限。拍照识别用的 Pl@ntNet API key 是 Worker 的 secret `PLANTNET_API_KEY`，不进仓库；本地开发写在 `web/.dev.vars` 里。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
+构建用的凭据要有 D1 的编辑权限。两个 secret 不进仓库，本地开发写在 `web/.dev.vars` 里：拍照识别用的 `PLANTNET_API_KEY`，后台密码 `ADMIN_PASSWORD`。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
 
 ## 目录
 

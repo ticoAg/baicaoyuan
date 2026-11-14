@@ -5,8 +5,12 @@
 //   public/data/featured/*.json 首页随机展示用的物种，分成小文件，一次取一个
 //   src/generated/*.json        预渲染页面（分类、专题、关于）在构建时读取
 //
+// 后台维护的改动（D1 的 edits 表）在这里并进搜索、分类、专题和首页；species.ndjson 不并，
+// 物种页在运行时自己合并。读不到改动表时照常构建。
+//
 // 数据目录可以用环境变量 BCY_DATA_DIR 指到别处。
 
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -49,6 +53,28 @@ const [taxa, names, dist, uses, flags, parts, hazards, traits, images, sources] 
 const G = {
   names: groupBy(names), dist: groupBy(dist), uses: groupBy(uses), flags: groupBy(flags),
   parts: groupBy(parts), hazards: groupBy(hazards), traits: groupBy(traits), images: groupBy(images),
+};
+
+// ── 后台的改动 ──────────────────────────────────────────────────────
+// 在 Workers Builds 里读线上库，其余时候读本地开发库。
+function loadEdits() {
+  const where = process.env.WORKERS_CI ? '--remote' : '--local';
+  const r = spawnSync(path.join(WEB, 'node_modules/.bin/wrangler'), ['d1', 'execute', 'DB', where, '--yes', '--json', '--command', 'SELECT id, patch, created FROM edits'], {
+    cwd: WEB, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  try {
+    return JSON.parse(r.stdout)[0].results.map((e) => ({ id: e.id, created: !!e.created, patch: JSON.parse(e.patch) }));
+  } catch {
+    if (where === '--remote') console.warn(`读不到后台的改动，这次构建不含它们：${(r.stderr || r.stdout || '').slice(0, 300)}`);
+    return [];
+  }
+}
+const BRIEF_FIELDS = ['k', 'zh', 'alias', 'fam', 'famZh', 'gen', 'genZh', 'img'];
+const edits = loadEdits();
+const patches = new Map(edits.filter((e) => !e.created).map((e) => [e.id, e.patch]));
+const patched = (brief, patch) => {
+  for (const f of BRIEF_FIELDS) if (f in patch) brief[f] = patch[f] ?? (f === 'alias' ? [] : undefined);
+  return brief;
 };
 
 // ── 物种详情 ────────────────────────────────────────────────────────
@@ -98,7 +124,13 @@ for (const t of taxa) {
     img: img && compact({ url: img.url, thumb: img.thumb, page: img.page, author: img.author, license: img.license, licenseUrl: img.license_url, src: img.source }),
   });
   docs.push(JSON.stringify(doc));
-  briefs.push({ id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, img });
+  const brief = { id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, img };
+  briefs.push(patches.has(id) ? patched(brief, patches.get(id)) : brief);
+}
+// 后台新建的词条
+const known = new Set(briefs.map((b) => b.id));
+for (const e of edits) {
+  if (e.created && !known.has(e.id) && e.patch.sci && e.patch.gen) briefs.push(patched({ id: e.id, sci: e.patch.sci, alias: [], safety: 'unknown', cult: false }, e.patch));
 }
 
 await rm(PUB, { recursive: true, force: true });
@@ -147,6 +179,8 @@ const taxonomy = [...families.values()]
   }))
   .sort((a, b) => a.k.localeCompare(b.k) || a.name.localeCompare(b.name));
 await writeFile(path.join(GEN, 'taxonomy.json'), JSON.stringify(taxonomy));
+// 后台编辑时的科名候选：[学名, 中文名]
+await writeFile(path.join(PUB, 'families.json'), JSON.stringify(taxonomy.filter((f) => f.name !== '未定科').map((f) => [f.name, f.zh ?? 0])));
 
 // ── 专题 ────────────────────────────────────────────────────────────
 const fam = (b) => b.famZh ?? b.fam ?? '未定科';
@@ -250,5 +284,5 @@ await writeFile(path.join(GEN, 'sources.json'), JSON.stringify(sources));
 const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(
   `数据：${briefs.length} 个物种（共 ${mb(docBytes)}，最大 ${(docMax / 1e3).toFixed(0)} KB），` +
-    `搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
+    `后台改动 ${edits.length} 条，搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
 );

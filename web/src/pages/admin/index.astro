@@ -1,0 +1,65 @@
+---
+// 维护后台：登录，找一个物种来改，或者新建词条。
+import { env } from 'cloudflare:workers';
+import Base from '../../layouts/Base.astro';
+import SearchBox from '../../components/SearchBox.astro';
+import { adminEnabled, isAdmin, SESSION } from '../../lib/admin';
+
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'no-store');
+
+const authed = await isAdmin(Astro.cookies.get(SESSION)?.value);
+interface Row { id: string; patch: string; created: number; updated: string; zh: string | null; sci: string | null }
+let edits: { id: string; zh?: string; sci: string; created: boolean; day: string }[] = [];
+if (authed) {
+  const { results } = await env.DB.prepare(
+    `SELECT e.id, e.patch, e.created, e.updated, json_extract(s.doc, '$.zh') AS zh, json_extract(s.doc, '$.sci') AS sci
+     FROM edits e LEFT JOIN species s ON s.id = e.id ORDER BY e.updated DESC LIMIT 300`,
+  ).all<Row>();
+  edits = results.map((r) => {
+    const patch = JSON.parse(r.patch) as { zh?: string | null; sci?: string };
+    return { id: r.id, zh: (patch.zh === null ? undefined : patch.zh) ?? r.zh ?? undefined, sci: patch.sci ?? r.sci ?? r.id, created: !!r.created, day: r.updated.slice(0, 10) };
+  });
+}
+---
+<Base title="维护" headerSearch={false}>
+  <meta slot="head" name="robots" content="noindex" />
+  <div class="wrap admin">
+    <h1 class="page-title">维护</h1>
+    {!authed ? (
+      adminEnabled() ? (
+        <form class="admin-login" data-login>
+          <input type="password" name="password" placeholder="密码" autocomplete="current-password" required autofocus aria-label="密码" />
+          <button class="btn primary">登录</button>
+          <p class="form-msg" role="alert"></p>
+        </form>
+      ) : <p class="lead">后台还没有设置密码。</p>
+    ) : (
+      <>
+        <div class="admin-find">
+          <SearchBox autofocus placeholder="找一个物种来改：中文名、拼音、学名" />
+          <a class="btn primary" href="/admin/edit">新建词条</a>
+        </div>
+        <section class="section">
+          <h2>改过的词条<span class="count">{edits.length}</span><button type="button" class="again" data-logout>退出</button></h2>
+          {edits.length ? (
+            <ul class="admin-list">
+              {edits.map((e) => (
+                <li>
+                  <a href={`/admin/edit?id=${e.id}`}>
+                    {e.zh ? <span class="zh">{e.zh}</span> : <span class="zh only-sci">{e.sci}</span>}
+                    {e.zh && <span class="sci">{e.sci}</span>}
+                    <span class="extra">{e.created && '新建 · '}{e.day}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : <p class="note">还没有。</p>}
+        </section>
+      </>
+    )}
+  </div>
+  <script>
+    import '../../scripts/admin.ts';
+  </script>
+</Base>

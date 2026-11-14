@@ -13,14 +13,55 @@ export interface Species {
   uses?: { c: string; texts?: string[]; refs?: number[] }[]; refs?: string[];
   flags?: { f: string; src: string[]; ref?: string }[];
   traits?: [string, string][];
-  img?: { url: string; thumb: string; page: string; author: string; license: string; licenseUrl?: string; src: string };
+  /** 后台新建的词条，不来自数据管线。 */
+  manual?: boolean;
+  img?: { url: string; thumb: string; page?: string; author: string; license: string; licenseUrl?: string; src: string };
 }
 
-/** 物种数据在 D1 里，一个物种一行 JSON。数据库出错时抛出，由页面返回 503。 */
+export const validId = (id: string) => /^[A-Za-z0-9_-]{3,90}$/.test(id);
+
+/** 后台的改动盖在数据上：patch 里值为 null 的字段去掉，其余的覆盖。 */
+export function applyPatch(doc: Species | null, patch: string | null): Species | null {
+  if (!patch) return doc;
+  const out = { ...(doc ?? {}) } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(JSON.parse(patch) as Record<string, unknown>)) {
+    if (v === null) delete out[k];
+    else out[k] = v;
+  }
+  return out as unknown as Species;
+}
+
+/**
+ * 物种数据在 D1 里：species 表一个物种一行 JSON，来自数据管线；edits 表是后台维护的改动。
+ * 数据库出错时抛出，由页面返回 503。
+ */
 export async function loadSpecies(id: string): Promise<Species | null> {
-  if (!/^[A-Za-z0-9_-]{3,90}$/.test(id)) return null;
-  const row = await env.DB.prepare('SELECT doc FROM species WHERE id = ?1').bind(id).first<{ doc: string }>();
-  return row ? (JSON.parse(row.doc) as Species) : null;
+  if (!validId(id)) return null;
+  const row = await env.DB.prepare('SELECT (SELECT doc FROM species WHERE id = ?1) AS doc, (SELECT patch FROM edits WHERE id = ?1) AS patch')
+    .bind(id)
+    .first<{ doc: string | null; patch: string | null }>();
+  if (!row?.doc && !row?.patch) return null;
+  return applyPatch(row.doc ? (JSON.parse(row.doc) as Species) : null, row.patch);
+}
+
+/** 一次读多个物种。 */
+export async function loadMany(ids: string[]): Promise<Map<string, Species>> {
+  const wanted = [...new Set(ids.filter(validId))];
+  const out = new Map<string, Species>();
+  if (!wanted.length) return out;
+  const marks = wanted.map((_, i) => `?${i + 1}`).join(', ');
+  const { results } = await env.DB.prepare(
+    `SELECT id, doc, NULL AS patch FROM species WHERE id IN (${marks}) UNION ALL SELECT id, NULL, patch FROM edits WHERE id IN (${marks})`,
+  )
+    .bind(...wanted)
+    .all<{ id: string; doc: string | null; patch: string | null }>();
+  for (const r of results) if (r.doc) out.set(r.id, JSON.parse(r.doc) as Species);
+  for (const r of results) {
+    if (!r.patch) continue;
+    const sp = applyPatch(out.get(r.id) ?? null, r.patch);
+    if (sp) out.set(r.id, sp);
+  }
+  return out;
 }
 
 /** 数据库读不到（没灌数据、超出每日额度、故障）时的回应。 */

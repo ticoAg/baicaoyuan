@@ -5,6 +5,8 @@ import { glyphSvg, LEVEL_CODES, LEVELS, slugOf } from '../lib/shared.js';
 
 type Row = [sci: string, zh: string | 0, alias: string | 0, fam: string | 0, level: number, kingdom: number];
 interface Entry {
+  /** 只有后台改过的词条带；其余的由学名算出。 */
+  id?: string;
   sci: string;
   sciLower: string;
   zh: string;
@@ -19,26 +21,43 @@ export interface Hit {
   via?: string; // 命中的是别名时，显示它
 }
 
+type Patch = [id: string, ...Row];
+const entry = (r: Row, id?: string): Entry => ({
+  id,
+  sci: r[0],
+  sciLower: r[0].toLowerCase(),
+  zh: r[1] || '',
+  alias: r[2] ? r[2].split('|') : [],
+  fam: r[3] || '',
+  level: r[4],
+  fungus: r[5] === 1,
+});
+
 let index: Promise<{ entries: Entry[]; py: Record<string, string[]> }> | null = null;
 
 export function loadIndex() {
-  index ??= fetch('/data/search.json')
-    .then((r) => {
+  index ??= Promise.all([
+    fetch('/data/search.json').then((r) => {
       if (!r.ok) throw new Error(`search.json ${r.status}`);
-      return r.json();
+      return r.json() as Promise<{ rows: Row[]; py: Record<string, string> }>;
+    }),
+    // 后台改过、还没进索引的词条。取不到就不管；维护的人自己不走浏览器缓存，刚改的马上能搜到
+    fetch('/api/overlay.json', document.cookie.includes('bcy_m=1') ? { cache: 'no-store' } : undefined)
+      .then((r) => (r.ok ? (r.json() as Promise<{ rows: Patch[] }>) : { rows: [] }))
+      .catch(() => ({ rows: [] as Patch[] })),
+  ])
+    .then(([d, overlay]) => {
+      const entries = d.rows.map((r) => entry(r));
+      if (overlay.rows.length) {
+        const at = new Map(entries.map((e, i) => [slugOf(e.sci), i]));
+        for (const [id, ...row] of overlay.rows) {
+          const i = at.get(id);
+          if (i == null) entries.push(entry(row, id));
+          else entries[i] = entry(row, id);
+        }
+      }
+      return { entries, py: Object.fromEntries(Object.entries(d.py).map(([k, v]) => [k, v.split(',')])) };
     })
-    .then((d: { rows: Row[]; py: Record<string, string> }) => ({
-      entries: d.rows.map((r) => ({
-        sci: r[0],
-        sciLower: r[0].toLowerCase(),
-        zh: r[1] || '',
-        alias: r[2] ? r[2].split('|') : [],
-        fam: r[3] || '',
-        level: r[4],
-        fungus: r[5] === 1,
-      })),
-      py: Object.fromEntries(Object.entries(d.py).map(([k, v]) => [k, v.split(',')])),
-    }))
     .catch((err) => {
       index = null;
       throw err;
@@ -122,7 +141,7 @@ export function renderHit(h: Hit, i: number): string {
   const via = h.via ? `<span class="via">别名：${esc(h.via)}</span>` : '';
   const sub = [h.e.zh ? `<i class="sci">${esc(h.e.sci)}</i>` : '', esc(h.e.fam), h.e.fungus ? '真菌' : ''].filter(Boolean).join(' · ');
   return (
-    `<a class="hit" role="option" id="hit-${i}" href="/s/${slugOf(h.e.sci)}">` +
+    `<a class="hit" role="option" id="hit-${i}" href="/s/${h.e.id ?? slugOf(h.e.sci)}">` +
     `<span class="g lv tone-${lv.tone}">${glyphSvg(code)}</span>` +
     `<span class="n">${name}${via}</span><span class="l lv tone-${lv.tone}">${lv.label}</span>` +
     `<span class="s">${sub}</span></a>`

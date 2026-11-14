@@ -19,5 +19,7 @@
       "database_id": "1b22732c-c0c3-4ef9-a84e-6aa5dddda245"
     }
   ],
+  // 后台上传的图片
+  "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "baicaoyuan-images" }],
   "observability": { "enabled": true }
 }

@@ -6,7 +6,7 @@ type Item = [id: string, zh: string, sci: string, fam: string, level: number, th
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 /** 大图用更大的尺寸。 */
-const large = (thumb: string) => thumb.replace('width=500', 'width=960').replace('/medium.', '/large.');
+const large = (thumb: string) => thumb.replace('width=500', 'width=960').replace('/medium.', '/large.').replace(/-s\.jpg$/, '.jpg');
 
 function render(slot: HTMLAnchorElement, pool: Item[]) {
   const item = pool.pop();

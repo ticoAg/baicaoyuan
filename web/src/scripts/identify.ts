@@ -1,6 +1,7 @@
-// 拍照识别页：照片在浏览器里缩小、重新编码（顺带去掉拍摄位置等信息），再交给 /api/identify。
+// 拍照识别页：照片在浏览器里缩小后交给 /api/identify。
 
 import { glyphSvg, LEVELS } from '../lib/shared.js';
+import { shrink } from './shrink';
 
 interface Candidate {
   score: number;
@@ -23,23 +24,6 @@ const MESSAGES: Record<string, string> = {
 };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
-async function shrink(file: File): Promise<Blob> {
-  const src = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/jpeg', 0.88));
-  } finally {
-    URL.revokeObjectURL(src);
-  }
-}
 
 function candidate(c: Candidate): string {
   const pct = `${Math.round(c.score * 100)}%`;
@@ -84,7 +68,7 @@ function attach(root: HTMLElement) {
 
     try {
       const form = new FormData();
-      for (const blob of await Promise.all(files.map(shrink))) form.append('images', blob, 'photo.jpg');
+      for (const blob of await Promise.all(files.map((f) => shrink(f, MAX_SIDE)))) form.append('images', blob, 'photo.jpg');
       const res = await fetch('/api/identify', { method: 'POST', body: form });
       const data = (await res.json().catch(() => ({}))) as { results?: Candidate[]; error?: string };
       if (mine !== seq) return;
