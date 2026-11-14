@@ -1,12 +1,12 @@
 # 百草园 · 数据源与同类项目调研
 
-调研日期：2026-11-13。许可证均在原始页面、DataCite、Zenodo、ChecklistBank 或 GBIF 元数据上核对过；未能核实的标 `?`。
+调研日期：2026-11-13 至 14。各来源的地址、许可和实测结果登记在 [sources.md](sources.md)，产品形态见 [product.md](product.md)。
 
 ## 结论
 
 1. **没有可以直接复用的现成项目。** 中文、覆盖植物与真菌、细到"部位 → 用途 → 处理方法"、带图谱的开源项目，目前没有。最接近的 PFAF 是英文的，而且有版权；国内的形色、花伴侣、植物智 App 都是闭源的。这个方向值得做。
-2. **"骨架数据"可以完全用开放许可的数据拼出来**：学名、中文名/别名、分布、食用/药用/有毒标记、图片都有 CC0 / CC BY / CC BY-SA 的来源。
-3. **真正的缺口在"内容层"**：各部位的处理方法、中文栽培方法、口感评价、易混淆物种，都没有干净的开放数据。富集的来源（PFAF、Useful Tropical Plants、中国植物志正文）都有版权或是非商业许可。这一层需要自建：从 CC BY 文献、维基百科、药典 public 层中抽取事实，每条带证据。这和 baicao-knowledge 现有的抽取流程是一致的。
+2. **"骨架数据"可以完全用开放许可的数据拼出来，并且已经实测能下载**：学名、中文名和别名、分布、食用标记、植物毒性、图片都有 CC0 / CC BY / CC BY-SA 的来源。中国 3.7 万种植物里 89% 能取到中文名，其中 5,289 种有食用记录。
+3. **真正的缺口在"内容层"**：现代中文的处理方法、栽培方法、中毒症状、易混淆物种，都没有干净的开放数据。富集的来源（PFAF、Useful Tropical Plants、中国植物志正文）都有版权或是非商业许可。能直接起步的有两样：《救荒本草》（公有领域，411 种救荒植物的食用部位与做法）和西双版纳数据集（CC BY，部位与加工方法）。其余要自建：从 CC BY 文献、维基百科、药典 public 层中抽取事实，每条带证据。这和 baicao-knowledge 现有的抽取流程是一致的。
 4. **许可证建议**：数据层用 **CC BY-SA 4.0**（要吸收 zh.wikipedia、Growstuff 的内容），代码用 MIT 或 Apache-2.0。NC、ND 来源只用于比对和校验，不进入发布数据。
 
 ## 同类项目
@@ -29,97 +29,32 @@
 
 GitHub、Gitee 上的中文"野菜 / 毒蘑菇"项目只有 YOLO 识别 demo，数据集来源不明。
 
-## 按字段选源
+## 数据怎么拼
 
-✅ 可入库　⚠ 只提取事实，或只用于匹配与校验，不分发原文件　❌ 只作参考或外链
+每个来源的地址、许可、实测结果见 [sources.md](sources.md)。下面只列每一层用什么。
 
-### 学名骨架
-
-| 来源 | 规模 | 许可 | 获取 | |
-|---|---|---|---|---|
-| [WFO Plant List](https://zenodo.org/records/20782718) | 全球植物接受名与异名 | CC0 | Zenodo 年更两次（2026-06 版） | ✅ 主键 |
-| [WCVP](https://sftp.kew.org/pub/data-repositories/WCVP/) | 约 140 万名称，含 TDWG 分布与生活型 | CC BY 4.0 | SFTP，84 MB | ✅ |
-| [Catalogue of Life](https://www.catalogueoflife.org/data/download) | 547 万名称，XR 版 850 万 | CC BY 4.0 | 月更；GBIF Backbone 已于 2023 年冻结，被它取代 | ✅ |
-| [CoL China 2025（ChecklistBank）](https://www.checklistbank.org/dataset/312616) | 约 16 万分类单元 | CC BY | DwC-A | ✅ 只有拉丁名，没有中文名 |
-| [Species Fungorum Plus](https://www.checklistbank.org/dataset/2073) | 全球真菌名称 | CC BY | DwC-A | ✅ 真菌 |
-
-### 中文名 / 别名 / 地方名
-
-| 来源 | 规模 | 许可 | | |
-|---|---|---|---|---|
-| [Wikidata](https://www.wikidata.org) | 约 89 万条目带 POWO ID；常见种的中文标签和别名很全（如马齿苋有 23 个别名） | CC0 | SPARQL / dump | ✅ ID 枢纽 |
-| [TaiCOL](https://taicol.tw) | 台湾物种名录，繁体中文名 | CC BY 4.0 | GBIF | ✅ 用 OpenCC 转简体后作别名 |
-| [西双版纳民间传统利用植物数据集](https://doi.org/10.57760/sciencedb.7) | 1,071 种：学名、地方名、用途、利用部位、加工方法、民族 | CC BY 4.0 | xlsx | ✅ 字段几乎与本项目一一对应 |
-| [J. Ethnobiol. Ethnomed.](https://ethnobiomed.biomedcentral.com) 上的中国野生食用植物调查（如独龙族调查，[figshare](https://doi.org/10.6084/m9.figshare.18865063)） | 各地区的地方名、部位、加工方法 | CC BY 4.0 | 论文补充材料 | ✅ 加工方法的最佳合法来源 |
-| [中国生物物种名录](http://www.sp2000.org.cn/download)（sp2000.org.cn） | 2026 版 168,871 个分类单元；植物界约 4.8 万个带中文名 | GBIF 版为 CC BY-NC 4.0；下载需填表 | xlsx / 需注册的 API | ⚠ 中文名对齐的最好来源，用于匹配；可去函申请授权 |
-
-### 形态特征
-
-| 来源 | 许可 | |
+| 层 | 用什么 | 实测 |
 |---|---|---|
-| zh / en Wikipedia | CC BY-SA 4.0 | ✅ 正文来源（需要相同方式共享） |
-| Wikidata 结构化性状：P4000 果实类型、P2827 花色；真菌 P783–P788 菌盖、菌褶等 | CC0 | ✅ |
-| [植物智 · 中国植物志 / FOC](https://www.iplant.cn/frps) | © 中科院植物所，无开放许可 | ❌ 正文不可转载。可以从中提取叶形、花期、株高等结构化事实，并注明出处和外链 |
+| 学名 | WFO（CC0）、WCVP（CC BY） | 中国（含台湾）有分布的接受种 36,678 个 |
+| 中文名、别名 | Wikidata（CC0）、TaiCOL（CC BY）、AGROVOC（CC BY） | 上述物种的 89% 能从 Wikidata 取到中文名；有噪声，要清洗 |
+| 分布 | WCVP（CC BY）、GBIF 中 CC0 / CC BY 的记录 | TDWG 三级区，中国分 10 个区 |
+| 食用标记 | World Checklist of Food Plants 2026（CC BY） | 中国 5,289 种，其中 5,095 种有中文名 |
+| 部位、用途、加工 | 西双版纳数据集（CC BY）、Dr. Duke（CC0）、Kew SEPASAL（CC BY）、药典（经 baicao-knowledge） | 西双版纳 1,071 种，675 行有食用部位，470 行有加工方法 |
+| 处理与去毒（中文原文） | 《救荒本草》《野菜博录》（公有领域） | 《救荒本草》411 条"救飢" |
+| 植物毒性 | TPPT（CC BY）、EFSA Compendium（CC BY）、Dr. Duke（CC0） | TPPT 844 种，带有毒部位和对人毒性分级 |
+| 蘑菇可食性与形态 | Wikidata P789、P783–P788（CC0），Mycomorphbox（CC BY-SA） | 1,566 个条目有可食性分级 |
+| 蘑菇中毒类型 | 中国毒蘑菇新修订名录 2024、疾控中心年报 | 有版权或 NC，逐条提取事实 |
+| 栽培 | OpenFarm 存档（CC0）、Growstuff（CC BY-SA）、Wikipedia | 英文为主；中文农事历要自建 |
+| 正文 | 中文维基百科（CC BY-SA） | 42,400 个植物条目、3,842 个真菌条目有中文页面 |
+| 图片 | Wikimedia Commons、iNaturalist、Mushroom Observer 中 CC0 / BY / BY-SA 的图 | 91,658 个植物条目在 Wikidata 上有图 |
+| 营养 | USDA FoodData Central（CC0） | — |
 
-### 地域分布
+仍然没有开放数据的：
 
-| 来源 | 许可 | |
-|---|---|---|
-| WCVP 原生 / 引入分布（TDWG 三级区，中国分为约 10 个大区） | CC BY 4.0 | ✅ |
-| [GBIF 观测记录](https://www.gbif.org) | 每个数据集不同，筛出 CC0 / CC BY | ✅ 省级分布、分布地图 |
-| [CVH 中国数字植物标本馆](https://www.cvh.ac.cn) | CC BY-NC-ND 4.0 | ⚠ |
-| [NSII](https://www.nsii.org.cn) 省级植物名录 | 未声明许可 | ⚠ 需要先询问 |
-
-### 食用 / 药用 / 有毒标记
-
-| 来源 | 规模 | 许可 | |
-|---|---|---|---|
-| [WCUPS 世界有用植物名录](https://doi.org/10.5063/F1CV4G34)（Kew） | 40,292 种 × 10 类用途，含"食物"和"毒物" | CC BY 4.0 | ✅ |
-| [Kew SEPASAL](https://sftp.kew.org/pub/data-repositories/sepasal/) | 6,988 种旱地植物，28,220 条用途记录，按部位拆分 | CC BY 4.0 | ✅ |
-| [EFSA Compendium of Botanicals](https://doi.org/10.5281/zenodo.1212388) | 按植物部位列出有害物质 | CC BY 4.0 | ✅ 毒性层 |
-| [GRIN Taxonomy](https://npgsweb.ars-grin.gov/gringlobal/taxon/taxonomysearch) | 作物经济用途、多语种俗名 | 公有领域 | ✅ 蔬菜、作物 |
-| [USDA PLANTS](https://plants.usda.gov) | 含毒性、适口性字段 | 公有领域 | ✅ 以北美为主 |
-| 药食同源目录（2002 年版及 2023、2024 年新增）、保健食品禁用物品名单、国家重点保护野生植物名录（2021） | 官方文件 | 不受著作权保护（著作权法第五条） | ✅ |
-| [中国有用维管植物名录](https://doi.org/10.1016/j.pld.2020.09.003)（Zhuang et al. 2021，Table S1） | 10,808 种 × 12 类用途计数（药用、食用、饲料、农药……） | CC BY-NC-ND 4.0 | ⚠ 重新推导标记后再用 |
-| PFAF / Useful Tropical Plants / FooDB | — | 有版权或 NC | ❌ |
-
-### 真菌：毒性与可食性
-
-| 来源 | 规模 | 许可 | |
-|---|---|---|---|
-| [中国毒蘑菇新修订名录](https://search.napstic.cn/literature/periodical/010jwyj202404001)（图力古尔等，菌物研究 2024, 22(4):301–321） | 660 种：中文名、学名、中毒类型 | 期刊版权 | ⚠ 作为主表，逐条带引用重新录入 |
-| [China CDC Weekly 年度蘑菇中毒报告](https://weekly.chinacdc.cn/en/article/doi/10.46234/ccdcw2025.106) | 累计 246 种实际致中毒物种，7 类中毒综合征 | CC BY-NC 4.0 | ⚠ 用于给毒蘑菇排序，决定前台优先展示哪些 |
-| [中国食药用菌物种编目](https://doi.org/10.57760/sciencedb.jwxb.00003)（菌物学报 2026） | 1,495 种：食用 1,013 种，药用 744 种 | CC BY-NC-ND 4.0 | ⚠ 校验 |
-| Wikidata [P789 可食性](https://www.wikidata.org/wiki/Property:P789) | 1,566 个条目，953 个有中文标签；分级：致命、有毒、谨慎、熟食可食、可食、上佳 | CC0 | ✅ |
-| en.wikipedia [Mycomorphbox](https://en.wikipedia.org/wiki/Template:Mycomorphbox) | `howEdible` 字段与形态字段（只在信息框里，不在 Wikidata 中） | CC BY-SA 4.0 | ✅ 从 dump 中解析 |
-| 真菌王国数据库（中科院昆明植物所，2026-05 起免费开放） | 8,791 种，2.8 万张照片 | 条款未公开 | ? 只能浏览；可联系合作 |
-| UCI Mushroom 数据集 | 23 种北美蘑菇的模拟样本 | CC BY 4.0 | ❌ 不适用 |
-
-### 栽培方法
-
-| 来源 | 许可 | |
-|---|---|---|
-| Growstuff | CC BY-SA 3.0 | ✅ 只有英文，偏欧美 |
-| FAO Ecocrop（约 2,568 种作物的气候与土壤需求；[GitHub 镜像](https://github.com/openclim/ecocrop)） | FAO 条款不明 | ? |
-| Wikipedia 的"栽培"章节 | CC BY-SA 4.0 | ✅ |
-| **中文农事历、播种期、育苗方法** | 没有开放数据源 | 需要自建 |
-
-### 图片
-
-| 来源 | 许可 | |
-|---|---|---|
-| [Wikimedia Commons](https://commons.wikimedia.org) | 每个文件 CC0 / PD / BY / BY-SA | ✅ 主力；外链显示并署名，不转存 |
-| [iNaturalist Open Data](https://github.com/inaturalist/inaturalist-open-data)（S3） | 每张照片单独授权，多数为 NC | ✅ 只取 CC0 / BY / BY-SA |
-| [Mushroom Observer](https://mushroomobserver.org)（每晚 CSV 导出） | 每张图片单独授权，默认 CC BY-SA | ✅ 真菌 |
-| [PPBC 中国植物图像库](https://ppbc.iplant.cn/copyright)、CFH 中国自然标本馆 | 需书面授权，禁止转载 | ❌ 只能外链 |
-| Pl@ntNet-300K、DF20 | CC BY / 仅限非商业 | 留给后续的识别模型训练 |
-
-### 营养
-
-| 来源 | 许可 | |
-|---|---|---|
-| [USDA FoodData Central](https://fdc.nal.usda.gov) | CC0 | ✅ |
-| 中国食物成分表的 GitHub 整理版（[Sanotsu](https://github.com/Sanotsu/china-food-composition-data)） | 原书版权，仅供学习 | ❌ |
+- 中毒症状、潜伏期、急救的结构化数据。
+- 现代中文的"部位 → 处理方法"。古籍和西双版纳数据集能起步，其余要从 CC BY 文献和维基百科里抽取。
+- 中文的播种期、农事历。
+- 易混淆物种对。
 
 ## 与 baicao-knowledge 的衔接
 
@@ -155,30 +90,17 @@ Taxon 物种 (WFO ID 为主键；植物与真菌共用)
 - 毒蘑菇页面把易混淆物种和中毒类型放在显著位置，并明确写出：民间鉴别方法（颜色、银针、虫咬）不可靠。
 - 存储沿用 baicao-knowledge 的"实体表 + 关系表 + 证据"Parquet 结构，可以复用现有的 `knowledge_model`。运行时不必上图数据库，Neo4j 只用于探索和质检。
 
-## 技术路线
-
-| 层 | 选型 |
-|---|---|
-| 数据管线 | Python + DuckDB / Parquet；发布到 Hugging Face（新建一个数据集，或作为 baicao-knowledge 的新 config） |
-| 内容抽取 | 对 CC BY 文献和 Wikipedia 做 LLM 结构化抽取，每条带 `evidence_ref`，再人工抽检 |
-| Web | 静态站点（Astro 或 Next.js SSG）+ Pagefind 全文检索 + Cytoscape.js 关系图；部署到 GitHub Pages 或 Cloudflare Pages |
-| 图片 | 外链 Commons 和 iNaturalist 原图，页面上显示作者与许可 |
-| 社区 | 词条以 YAML / Markdown 形式放在仓库里，通过 PR 贡献；CI 校验许可字段和必填的安全字段 |
-
 ## MVP 范围
 
 | 批次 | 物种 | 主要来源 |
 |---|---|---|
 | 常见蔬菜 | 约 150 种 | GRIN、Wikidata、Wikipedia、USDA FDC |
-| 常见野菜 | 约 100 种 | 西双版纳数据集、JEBM 论文、药食同源目录 |
+| 常见野菜 | 约 100 种 | WCFP、西双版纳数据集、《救荒本草》、药食同源目录 |
 | 药典植物 | 约 490 种 | baicao-knowledge public 层 |
 | 毒蘑菇 | 约 100 种（CDC 报告中实际致中毒的物种优先） | 2024 名录、Wikidata P789、Mycomorphbox |
 | 常见食用菌 | 约 50 种 | Wikidata、Wikipedia |
-| 全量骨架 | 约 3 万种中国维管植物（只有名称、分布和标记，没有内容层） | WFO、WCVP、Wikidata、WCUPS |
+| 全量骨架 | 约 3.7 万种中国维管植物（只有名称、分布和标记，没有内容层） | WFO、WCVP、Wikidata、WCFP |
 
 ## 待确认
 
-- 真菌王国数据库的访问地址和使用条款（可联系昆明植物所）。
-- 去函 PFAF、物种 2000 中国节点，申请开源再分发授权；拿到的话，内容层和中文名两个缺口可以大幅收窄。
-- POWO 网站条款、FAO Ecocrop 许可、OpenKG 上的农业图谱（本次网络无法访问 openkg.cn 和 gitee.com）。
-- 本文对许可证的判断不构成法律意见。事实（名称、分布、"X 有毒"）一般不受著作权保护，但成段的描述文字和图片受保护。
+见 [sources.md](sources.md#待核实)。本文对许可证的判断不构成法律意见。事实（名称、分布、"X 有毒"）一般不受著作权保护，但成段的描述文字和图片受保护。

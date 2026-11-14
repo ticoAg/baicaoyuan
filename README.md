@@ -9,6 +9,10 @@
 - 毒性、中毒类型、易混淆物种
 - 栽培方法
 
-数据源调研见 [docs/research.md](docs/research.md)。
+| 文档 | 内容 |
+|---|---|
+| [docs/product.md](docs/product.md) | 产品形态 |
+| [docs/research.md](docs/research.md) | 同类项目与数据源调研 |
+| [docs/sources.md](docs/sources.md) | 数据源登记：地址、许可、实测结果 |
 
 > 野外采食有风险。本项目内容不能替代专业鉴定；无法确认的物种一律不要食用。
