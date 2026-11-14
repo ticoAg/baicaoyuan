@@ -1,0 +1,250 @@
+---
+// 物种页：结论在最上面，证据在最下面，中间按"人会问的顺序"排。
+// 由 Worker 按需渲染（见 astro.config.mjs 的说明）。
+import Base from '../../layouts/Base.astro';
+import Level from '../../components/Level.astro';
+import sources from '../../generated/sources.json';
+import { glyphSvg, PROVINCE_TILES, REGIONS, SITE } from '../../lib/shared.js';
+import { loadSpecies, notFound, REDLIST, src, verdict } from '../../lib/species';
+
+export const prerender = false;
+
+const id = Astro.params.id ?? '';
+const sp = await loadSpecies(id, Astro.url);
+if (!sp) {
+  // 大小写、空格写法不同的，转到规范地址
+  const fixed = id.replace(/[\s+]+/g, '_').replace(/^./, (c) => c.toUpperCase());
+  if (fixed !== id && (await loadSpecies(fixed, Astro.url))) return Astro.redirect(`/s/${fixed}`, 301);
+  return notFound(Astro.url);
+}
+Astro.response.headers.set('Cache-Control', 'public, max-age=600, s-maxage=86400, stale-while-revalidate=604800');
+
+const fungus = sp.k === 'fungus';
+const title = sp.zh ?? sp.sci;
+const v = verdict(sp);
+const parts = sp.parts ?? [];
+const hazards = sp.hazards ?? [];
+const uses = sp.uses ?? [];
+const refs = sp.refs ?? [];
+const flags = sp.flags ?? [];
+const dist = new Map(sp.dist ?? []);
+const provinceStatus = new Map<string, string>();
+for (const [code, r] of Object.entries(REGIONS)) {
+  const st = dist.get(code);
+  if (st) for (const p of r.provinces) provinceStatus.set(p, st === 'n' ? 'native' : 'introduced');
+}
+const regionNames = (st: string) => Object.entries(REGIONS).filter(([c]) => dist.get(c) === st).map(([, r]) => r.name);
+
+// 部位表：毒性记录和按部位的食用记录放在一张表里，最严的排前
+const rows = [
+  ...hazards.map((h) => ({ part: h.part, level: h.lv, label: h.label, use: h.toxins ? `含 ${h.toxins}` : '', note: h.note, src: h.src, ref: h.ref })),
+  ...parts.map((p) => ({ part: p.part, level: p.v, label: undefined as string | undefined, use: p.use ?? '', note: p.note, src: p.src, ref: p.ref })),
+];
+const used = new Set<string>([
+  ...(sp.dist?.length ? ['wcvp'] : sp.k === 'plant' ? ['wcvp'] : []),
+  ...rows.map((r) => r.src),
+  ...flags.flatMap((f) => f.src),
+  ...(uses.length ? ['cn_useful'] : []),
+  ...(sp.traits?.length ? ['wikidata'] : []),
+  ...(sp.wd ? ['wikidata'] : []),
+  ...(sp.img ? ['commons'] : []),
+]);
+const usedSources = sources.filter((s) => used.has(s.id));
+const famPath = `/t/${sp.fam ?? '未定科'}/`;
+const issue = `${SITE.repo}/issues/new?title=${encodeURIComponent(`纠错：${title}（${sp.sci}）`)}&body=${encodeURIComponent(`页面：${Astro.url.origin}/s/${sp.id}\n\n哪里不对：\n\n依据（文献、链接）：\n`)}`;
+const links = [
+  sp.powo && ['Plants of the World Online', `https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:${sp.powo}`],
+  sp.k === 'plant' && ['植物智（中国植物志）', `https://www.iplant.cn/info/${encodeURIComponent(sp.sci)}`],
+  sp.zhwiki && ['中文维基百科', `https://zh.wikipedia.org/wiki/${encodeURIComponent(sp.zhwiki)}`],
+  sp.wd && ['Wikidata', `https://www.wikidata.org/wiki/${sp.wd}`],
+  ['GBIF', `https://www.gbif.org/species/search?q=${encodeURIComponent(sp.sci)}`],
+].filter(Boolean) as [string, string][];
+const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v.lv.label}：${v.lines[0] ?? ''}`.slice(0, 150);
+---
+<Base title={sp.zh ? `${sp.zh} ${sp.sci}` : sp.sci} description={description}>
+  <link slot="head" rel="alternate" type="application/json" href={`/s/${sp.id}.json`} />
+  <div class="wrap">
+    <nav class="crumbs" aria-label="位置">
+      <a href="/t/">分类</a><span aria-hidden="true">›</span>
+      <a href={famPath}>{sp.famZh ?? sp.fam ?? '未定科'}</a><span aria-hidden="true">›</span>
+      <a href={`${famPath}${sp.gen}/`}>{sp.genZh ?? sp.gen}</a>
+    </nav>
+
+    <header class="sp-head">
+      <div>
+        <h1>{sp.zh ?? <i class="sci">{sp.sci}</i>}</h1>
+        <p class="sciname">
+          {sp.zh && <i class="sci">{sp.sci}</i>}
+          {sp.au && <span class="au">{sp.au}</span>}
+          {!sp.zh && <span class="muted small">暂无中文名</span>}
+        </p>
+      </div>
+      <p class="family">
+        <a href={famPath}>{sp.famZh ?? sp.fam}</a>
+        {sp.famZh && sp.fam && <><br /><span class="muted small">{sp.fam}</span></>}
+      </p>
+    </header>
+    {sp.alias?.length ? (
+      <p class="aliases"><b class="muted small">别名　</b>{sp.alias.slice(0, 24).map((a) => <span>{a}</span>)}{sp.alias.length > 24 && <span class="muted">等 {sp.alias.length} 个</span>}</p>
+    ) : null}
+
+    <div class="sp-layout">
+      <article>
+        <section class={`verdict tone-${v.lv.tone}`} aria-label="安全结论">
+          <span class="glyph" set:html={glyphSvg(sp.safety)} />
+          <p class="headline">{v.lv.label}{sp.safety === 'unknown' && <> · 不要吃</>}<small>{sp.safety === 'food_record' ? '未经审核，不能据此食用' : sp.safety === 'unknown' ? '' : '机器合并，未经人工审核'}</small></p>
+          <div class="body">
+            {v.lines.map((l) => <p>{l}</p>)}
+            {v.tail && <p class="small">{v.tail}</p>}
+          </div>
+        </section>
+        {fungus && <p class="fixed-warning">颜色、银针、虫咬都不能用来判断蘑菇有没有毒。</p>}
+
+        {sp.img && (
+          <figure class="figure">
+            <img src={`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(sp.img.file)}?width=960`} alt={`${title}的照片`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').hidden=true" />
+            <figcaption>
+              图：{sp.img.author} · {sp.img.licenseUrl ? <a href={sp.img.licenseUrl} rel="license noopener">{sp.img.license}</a> : sp.img.license} ·
+              <a href={`https://commons.wikimedia.org/wiki/File:${encodeURIComponent(sp.img.file)}`} rel="noopener">Wikimedia Commons</a>
+            </figcaption>
+          </figure>
+        )}
+
+        {rows.length > 0 && (
+          <section class="section">
+            <h2>各部位 <span class="count">能不能吃、有什么记录</span></h2>
+            <div class="table-scroll">
+              <table class="data parts">
+                <thead><tr><th>部位</th><th>结论</th><th>记录</th><th>备注</th><th>出处</th></tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr>
+                      <td>{r.part ?? <span class="muted">未注明</span>}</td>
+                      <td>{r.level ? <Level level={r.level} label={r.label} /> : <span class="muted">{r.label ?? '—'}</span>}</td>
+                      <td>{r.use || <span class="muted">—</span>}</td>
+                      <td class="small">{r.note ?? ''}</td>
+                      <td class="small">{src(r.src)}{r.ref && <><br /><span class="muted">{r.ref}</span></>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="note">这些是各来源的原始记录，每条只有一个来源，未经人工审核。没有列出的部位按"未知，不要吃"对待。</p>
+          </section>
+        )}
+
+        {sp.traits?.length ? (
+          <section class="section">
+            <h2>怎么认 <span class="count">形态特征</span></h2>
+            <table class="data">
+              <tbody>
+                {[...new Set(sp.traits.map((t) => t[0]))].map((name) => (
+                  <tr><th scope="row" style="width:8rem">{name}</th><td>{sp.traits!.filter((t) => t[0] === name).map((t) => t[1]).join('、')}</td></tr>
+                ))}
+              </tbody>
+            </table>
+            <p class="note">来自 Wikidata，只能用来缩小范围，不能用来确认物种。</p>
+          </section>
+        ) : null}
+
+        {(flags.length > 0 || uses.length > 0) && (
+          <section class="section">
+            <h2>用途记录 <span class="count">有记载即列出，不代表安全</span></h2>
+            {flags.length > 0 && (
+              <p>{flags.map((f) => <span class="chip">{f.f} <span class="muted small">{f.src.map(src).join('、')}</span></span>)}</p>
+            )}
+            {uses.map((u) => (
+              <div class="use">
+                <h3>{u.c}</h3>
+                <div>
+                  {u.texts?.length ? <p style="margin:0">{u.texts.slice(0, 30).map((t) => <span class="chip">{t}</span>)}</p> : null}
+                  {u.refs?.length ? (
+                    <details class="refs">
+                      <summary>文献 {u.refs.length} 条 · 中国有用植物数据集</summary>
+                      <ol>{u.refs.map((i) => <li>{refs[i]}</li>)}</ol>
+                    </details>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+            {flags.find((f) => f.f === '食用' && f.ref) && (
+              <details class="refs">
+                <summary>WCFP 的食用文献</summary>
+                <ol>{flags.find((f) => f.f === '食用' && f.ref)!.ref!.split(/;\s+/).map((r) => <li>{r}</li>)}</ol>
+              </details>
+            )}
+          </section>
+        )}
+
+        {sp.k === 'plant' && (
+          <section class="section">
+            <h2>哪里有 <span class="count">中国境内的分布</span></h2>
+            {dist.size ? (
+              <div class="dist">
+                <div>
+                  <div class="tilemap" role="img" aria-label={`分布：${[...regionNames('n'), ...regionNames('i')].join('、')}`}>
+                    {PROVINCE_TILES.map(([abbr, full, col, row]) => (
+                      <span class={`tile ${provinceStatus.get(full as string) ?? ''}`} style={`grid-column:${(col as number) + 1};grid-row:${(row as number) + 1}`} title={`${full}${provinceStatus.has(full as string) ? (provinceStatus.get(full as string) === 'native' ? '：所在大区有原生分布' : '：所在大区有引入') : ''}`}>{abbr}</span>
+                    ))}
+                  </div>
+                  <p class="dist-key"><span><i style="background:var(--accent)"></i>原生</span><span><i style="box-shadow:inset 0 0 0 1.5px var(--accent);background:var(--accent-wash)"></i>引入</span><span><i style="background:var(--muted-wash)"></i>无记录</span></p>
+                </div>
+                <div>
+                  {regionNames('n').length > 0 && <p><strong>原生</strong>　{regionNames('n').join('、')}</p>}
+                  {regionNames('i').length > 0 && <p><strong>引入</strong>　{regionNames('i').join('、')}</p>}
+                  <p class="note">精度是 TDWG 三级区：中国分成 10 个大区，同一大区里的省份一起着色，不代表每个省都有。来源：WCVP。</p>
+                </div>
+              </div>
+            ) : (
+              <p class="note">WCVP 没有记录它在中国的野生分布。它出现在这里，是因为中文来源提到了它，多半是栽培或进口的植物。</p>
+            )}
+          </section>
+        )}
+
+        <section class="section">
+          <h2>出处</h2>
+          <ol class="sources">
+            {usedSources.map((s) => (
+              <li><a href={s.url} rel="noopener">{s.title}</a>{s.version && <span class="muted">（{s.version}）</span>} · {s.license}</li>
+            ))}
+          </ol>
+          <p class="note">本页由开放数据自动合并生成。发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
+        </section>
+      </article>
+
+      <aside class="sp-aside">
+        <section>
+          <h2>分类</h2>
+          <dl>
+            {sp.ord && <><dt>目</dt><dd>{sp.ord}</dd></>}
+            <dt>科</dt><dd><a href={famPath}>{sp.famZh ?? sp.fam ?? '未定'}</a> {sp.famZh && <span class="muted small">{sp.fam}</span>}</dd>
+            <dt>属</dt><dd><a href={`${famPath}${sp.gen}/`}>{sp.genZh ?? sp.gen}</a> {sp.genZh && <i class="sci muted small">{sp.gen}</i>}</dd>
+            <dt>类群</dt><dd>{fungus ? '真菌' : '维管植物'}</dd>
+          </dl>
+        </section>
+        {(sp.lf || sp.cl || sp.k === 'plant') && (
+          <section>
+            <h2>习性</h2>
+            <dl>
+              {sp.lf && <><dt>生活型</dt><dd>{sp.lf}</dd></>}
+              {sp.cl && <><dt>气候</dt><dd>{sp.cl}</dd></>}
+              {sp.k === 'plant' && <><dt>来历</dt><dd>{sp.nat ? '中国原生' : sp.cn ? '引入后归化' : '中国无野生分布记录'}{sp.cult && '，栽培作物'}</dd></>}
+              {sp.rl && REDLIST[sp.rl] && <><dt>红色名录</dt><dd>{REDLIST[sp.rl]}（{sp.rl}）</dd></>}
+            </dl>
+          </section>
+        )}
+        <section>
+          <h2>别处查看</h2>
+          <ul>{links.map(([label, href]) => <li><a href={href} rel="noopener">{label}</a></li>)}</ul>
+        </section>
+        <section>
+          <h2>本页数据</h2>
+          <ul>
+            <li><a href={`/s/${sp.id}.json`}>JSON</a> <span class="muted small">各条记录按其来源的许可</span></li>
+            <li><a href={issue} rel="noopener">纠错</a></li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+</Base>

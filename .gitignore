@@ -1,0 +1,15 @@
+# 原始下载与中间产物
+data/raw/
+data/tmp/
+# Python
+__pycache__/
+.venv/
+*.pyc
+# Node
+node_modules/
+web/dist/
+web/.astro/
+web/.wrangler/
+web/src/generated/
+web/public/data/
+.DS_Store

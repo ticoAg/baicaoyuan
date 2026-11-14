@@ -1,0 +1,11 @@
+---
+interface Props { autofocus?: boolean; placeholder?: string; value?: string }
+const { autofocus = false, placeholder = '搜索：中文名、别名、拼音、学名', value = '' } = Astro.props;
+---
+<form class="search" role="search" action="/search/" data-search>
+  <label class="visually-hidden" for={autofocus ? 'q-main' : 'q-top'}>搜索物种</label>
+  <input id={autofocus ? 'q-main' : 'q-top'} name="q" type="search" autocomplete="off" spellcheck="false" placeholder={placeholder} value={value}
+    autofocus={autofocus} role="combobox" aria-expanded="false" aria-autocomplete="list" />
+  <kbd aria-hidden="true">/</kbd>
+  <div class="search-panel" role="listbox" hidden></div>
+</form>

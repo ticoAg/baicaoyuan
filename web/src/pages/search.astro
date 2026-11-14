@@ -1,0 +1,29 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+---
+<Base title="搜索" headerSearch={false}>
+  <div class="wrap page-search">
+    <h1 class="page-title">搜索</h1>
+    <SearchBox autofocus />
+    <p class="note" id="summary" style="margin-top:1rem">可以输入中文名、别名、拼音（全拼或首字母）、学名。</p>
+    <div id="results" style="max-width:46rem"></div>
+  </div>
+  <script>
+    import { renderHit, search } from '../scripts/search.ts';
+    const q = new URLSearchParams(location.search).get('q') ?? '';
+    const input = document.querySelector<HTMLInputElement>('#q-main')!;
+    const out = document.querySelector<HTMLElement>('#results')!;
+    const summary = document.querySelector<HTMLElement>('#summary')!;
+    input.value = q;
+    if (q.trim()) {
+      document.title = `${q} · 搜索 · 百草园`;
+      search(q, 200)
+        .then((hits) => {
+          summary.textContent = hits.length ? `「${q}」：${hits.length >= 200 ? '前 200' : hits.length} 个结果` : `没有找到「${q}」。试试别名、拼音或学名。`;
+          out.innerHTML = hits.map(renderHit).join('');
+        })
+        .catch(() => (summary.textContent = '搜索索引加载失败，请检查网络后重试。'));
+    }
+  </script>
+</Base>

@@ -1,0 +1,61 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+import Level from '../components/Level.astro';
+import stats from '../generated/stats.json';
+import { LEVELS } from '../lib/shared.js';
+const n = (x: number) => x.toLocaleString('zh-CN');
+const tone: Record<string, string> = { danger: 'toxic', warn: 'warn', ok: 'ok', neutral: 'muted' };
+const tries = [['马齿苋', '/s/Portulaca_oleracea'], ['钩吻', '/s/Gelsemium_elegans'], ['番茄', '/s/Solanum_lycopersicum'], ['致命鹅膏', '/s/Amanita_exitialis'], ['香椿', '/s/Toona_sinensis']];
+const legend = ['edible', 'processed', 'limited', 'toxic', 'deadly', 'suspect', 'restricted', 'food_record', 'unknown'];
+---
+<Base headerSearch={false}>
+  <section class="hero">
+    <div class="wrap">
+      <h1>这是什么，<em>能不能吃</em>，怎么处理</h1>
+      <p class="lead">开源的中文植物与真菌图鉴。安全结论按部位给出，每条都带出处；没有证据的，一律写"不要吃"。</p>
+      <SearchBox autofocus placeholder="搜一种植物或蘑菇：马齿苋 / mcx / Portulaca" />
+      <p class="tries">试试　{tries.map(([t, href]) => <a href={href}>{t}</a>)}</p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="section">
+      <h2>专题</h2>
+      <div class="grid">
+        {stats.topics.map((t) => (
+          <a class={`card tone-${tone[t.kind]}`} href={`/topics/${t.slug}/`}>
+            <h3>{t.title}<span class="count">{n(t.n)} 种</span></h3>
+            <p>{t.lead}</p>
+          </a>
+        ))}
+        <a class="card" href="/t/">
+          <h3>分类浏览<span class="count">{n(stats.families)} 科 {n(stats.genera)} 属</span></h3>
+          <p>科 → 属 → 种。看这一科还有什么，它们之间有什么关系。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>安全等级 <span class="count">挂在部位上，用形状和文字区分</span></h2>
+      <ul class="legend">
+        {legend.map((k) => <li><Level level={k} /><span>{LEVELS[k as keyof typeof LEVELS].hint}</span></li>)}
+      </ul>
+      <p class="note" style="margin-top:0.9rem">取最严：任何一个来源记载有毒，就按有毒显示。"有食用记录"不等于"可食"——要升到"可食"，还需要该部位没有毒性记录，并通过人工审核。现阶段没有任何条目通过审核，所以你还看不到"可食"。</p>
+    </section>
+
+    <section class="section">
+      <h2>现在有什么 <span class="count">数据更新于 {stats.built}</span></h2>
+      <dl class="stats">
+        <div><dt>植物</dt><dd>{n(stats.plants)}</dd></div>
+        <div><dt>真菌</dt><dd>{n(stats.fungi)}</dd></div>
+        <div><dt>中文名与别名</dt><dd>{n(stats.names)}</dd></div>
+        <div><dt>用途记录</dt><dd>{n(stats.uses)}</dd></div>
+        <div><dt>有毒或致命</dt><dd>{n(stats.bySafety.toxic + stats.bySafety.deadly)}</dd></div>
+        <div><dt>可能有毒</dt><dd>{n(stats.bySafety.suspect)}</dd></div>
+        <div><dt>有食用记录</dt><dd>{n(stats.bySafety.food_record)}</dd></div>
+      </dl>
+      <p class="note" style="margin-top:1rem">目前是骨架：名称、分类、分布、用途标记和毒性记录都来自开放数据的自动合并。按部位的处理方法、易混淆物种、栽培方法还在建设中。<a href="/about/">数据从哪里来</a></p>
+    </section>
+  </div>
+</Base>

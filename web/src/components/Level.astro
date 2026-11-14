@@ -1,0 +1,8 @@
+---
+// 安全等级：形状 + 文字，不只靠颜色。
+import { glyphSvg, LEVELS } from '../lib/shared.js';
+interface Props { level: string; glyphOnly?: boolean; label?: string }
+const { level, glyphOnly = false, label } = Astro.props;
+const lv = LEVELS[level as keyof typeof LEVELS] ?? LEVELS.unknown;
+---
+<span class={`lv tone-${lv.tone}`} title={`${lv.label}：${lv.hint}`}><span class="glyph" set:html={glyphSvg(level)} />{glyphOnly ? <span class="visually-hidden">{lv.label}</span> : (label ?? lv.label)}</span>
