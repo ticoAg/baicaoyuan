@@ -6,7 +6,7 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { slugOf } from '../../lib/shared.js';
-import { loadMany, type Species } from '../../lib/species';
+import { imagesOf, loadMany, type Species } from '../../lib/species';
 import { bump, today, used, visitor } from '../../lib/usage';
 
 export const prerender = false;
@@ -119,14 +119,15 @@ export const POST: APIRoute = async ({ request, url, clientAddress }) => {
       const sp = known.get(ids[i]);
       const base = { score: r.score, sci: r.species.scientificNameWithoutAuthor };
       if (!sp) return { ...base, fam: r.species.family?.scientificNameWithoutAuthor, names: zhNames(r.species.commonNames ?? []) };
+      const img = imagesOf(sp)[0];
       return {
         ...base,
         id: sp.id,
         zh: sp.zh,
         fam: sp.famZh ?? sp.fam,
         safety: sp.safety,
-        thumb: sp.img?.thumb,
-        credit: sp.img && `${sp.img.author} · ${sp.img.license}`,
+        thumb: img?.thumb,
+        credit: img && `${img.author} · ${img.license}`,
       };
     }),
   });

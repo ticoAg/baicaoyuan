@@ -260,7 +260,12 @@ table.parts td:nth-child(5) { min-width: 9rem; }
 .sp-aside ul { margin: 0; padding: 0; list-style: none; }
 .sp-aside li { padding: 0.15rem 0; }
 .figure { margin: 1.4rem 0 0; }
-.figure img { display: block; width: 100%; max-height: 26rem; object-fit: cover; border-radius: var(--radius); background: var(--muted-wash); }
+.figure > img { display: block; width: 100%; max-height: 26rem; object-fit: cover; border-radius: var(--radius); background: var(--muted-wash); }
+.thumbs { display: flex; gap: 0.4rem; margin-top: 0.6rem; overflow-x: auto; }
+.thumbs a { flex: none; width: 4.6rem; aspect-ratio: 4 / 3; border-radius: 4px; overflow: hidden; background: var(--muted-wash); opacity: 0.6; }
+.thumbs a:hover, .thumbs a[aria-current] { opacity: 1; }
+.thumbs a[aria-current] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .figure figcaption { font-size: 0.78rem; color: var(--ink-3); margin-top: 0.35rem; }
 .fixed-warning { margin-top: 0.8rem; padding: 0.6rem 1rem; border: 1px dashed var(--toxic); border-radius: var(--radius); color: var(--toxic); font-weight: 600; font-size: 0.95rem; }
 details.refs { margin-top: 0.35rem; font-size: 0.85rem; }
@@ -345,10 +350,10 @@ a.cand:hover { background: var(--accent-wash); }
 .btn.danger:hover { border-color: var(--toxic); background: var(--toxic-wash); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .form-msg { margin: 0; font-size: 0.9rem; color: var(--toxic); }
-.admin input:not([type='radio'], [type='file'], [type='search']), .admin select { width: 100%; height: 2.5rem; padding: 0 0.8rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
+.admin input:not([type='radio'], [type='checkbox'], [type='file'], [type='search']), .admin select { width: 100%; height: 2.5rem; padding: 0 0.8rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
 .admin input:focus, .admin select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
-.admin-login { display: flex; flex-wrap: wrap; gap: 0.6rem; max-width: 24rem; margin-top: 1.2rem; }
-.admin-login input { flex: 1; }
+.admin-login { display: flex; flex-wrap: wrap; gap: 0.6rem; max-width: 34rem; margin-top: 1.2rem; }
+.admin-login input { flex: 1 1 9rem; }
 .admin-login .form-msg { flex-basis: 100%; }
 .admin-find { display: flex; gap: 0.6rem; max-width: 46rem; margin-top: 1.2rem; }
 .admin-find .search { margin: 0; max-width: none; }
@@ -369,13 +374,31 @@ a.cand:hover { background: var(--accent-wash); }
 .edit input.sci { font-size: 1.02rem; }
 .edit .kinds { display: flex; gap: 1.5rem; }
 .edit .kinds label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.95rem; color: var(--ink); }
-.edit .credit { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1.2rem; }
-.edit .credit[hidden] { display: none; }
-.edit-photo { display: flex; gap: 1.2rem; align-items: flex-start; }
-.edit-photo img { width: 12rem; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius); background: var(--muted-wash); }
-.edit-photo img[hidden] { display: none; }
-.edit-photo .btn { display: inline-flex; margin: 0 0.5rem 0.6rem 0; color: var(--accent-ink); font-size: 0.94rem; }
-.edit-photo .note { margin: 0; }
+.edit textarea { width: 100%; padding: 0.6rem 0.8rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); resize: vertical; }
+.edit textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.shots { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+.shots:empty { display: none; }
+.shot-card { position: relative; display: grid; grid-template-columns: 9rem minmax(0, 1fr) auto; gap: 0.9rem; align-items: start; padding: 0.7rem; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
+.shot-card > img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: var(--muted-wash); }
+.shot-card:first-child::before { content: '首图'; position: absolute; left: 1rem; top: 1rem; font-size: 0.72rem; line-height: 1.7; padding: 0 0.5rem; border-radius: 999px; color: var(--surface); background: var(--accent); }
+.shot-card:first-child [data-first] { display: none; }
+.shot-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.8rem; }
+.shot-acts { display: grid; gap: 0.4rem; width: 5.4rem; }
+.shot-acts .btn { height: 2.1rem; padding: 0 0.8rem; font-size: 0.84rem; font-weight: 500; }
+.edit label.btn { display: inline-flex; color: var(--accent-ink); font-size: 0.94rem; }
+.edit label.btn + .note { margin: 0.5rem 0 0; }
+.data-image { display: flex; gap: 0.9rem; align-items: center; font-size: 0.88rem; color: var(--ink-2); }
+.data-image img { width: 6rem; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: var(--muted-wash); }
+.data-image p { margin: 0 0 0.3rem; }
+.data-image label { display: inline-flex; align-items: center; gap: 0.4rem; }
+.people { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
+.people li { padding: 0.8rem 0.3rem; border-bottom: 1px solid var(--rule-2); }
+.people li > div:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.9rem; font-size: 0.9rem; color: var(--ink-2); }
+.people li > div:first-child .btn { margin-left: auto; }
+.people b { font-size: 1rem; color: var(--ink); }
+.people p { margin: 0.4rem 0 0.7rem; }
+.people-acts { display: flex; gap: 0.5rem; }
+.people .btn { height: 2.1rem; padding: 0 0.9rem; font-size: 0.86rem; }
 .edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
 
 /* 页脚 */
@@ -418,8 +441,10 @@ a.cand:hover { background: var(--accent-wash); }
   .sp-head h1 { font-size: 2.1rem; }
   .page-title { font-size: 1.8rem; }
   .use { grid-template-columns: 1fr; }
-  .edit fieldset, .edit .credit { grid-template-columns: 1fr; }
-  .edit-photo { flex-direction: column; }
+  .edit fieldset { grid-template-columns: 1fr; }
+  .shot-card { grid-template-columns: 6rem minmax(0, 1fr); }
+  .shot-fields { grid-template-columns: 1fr; }
+  .shot-acts { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; width: auto; }
   .search kbd { display: none; }
   .shoot-link { width: 3.3rem; padding: 0; justify-content: center; flex: none; }
   .shoot-link span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

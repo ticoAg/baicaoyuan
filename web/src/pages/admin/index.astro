@@ -1,47 +1,74 @@
 ---
-// 维护后台：登录，找一个物种来改，或者新建词条。
+// 维护后台：登录；找一个物种来改，或者新建词条；管理员在这里处理维护者的申请。
 import { env } from 'cloudflare:workers';
 import Base from '../../layouts/Base.astro';
 import SearchBox from '../../components/SearchBox.astro';
-import { adminEnabled, isAdmin, SESSION } from '../../lib/admin';
+import { adminEnabled, SESSION, whoIs } from '../../lib/admin';
 
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'no-store');
 
-const authed = await isAdmin(Astro.cookies.get(SESSION)?.value);
-interface Row { id: string; patch: string; created: number; updated: string; zh: string | null; sci: string | null }
-let edits: { id: string; zh?: string; sci: string; created: boolean; day: string }[] = [];
-if (authed) {
+const who = await whoIs(Astro.cookies.get(SESSION)?.value);
+interface Row { id: string; patch: string; created: number; updated: string; by: string; zh: string | null; sci: string | null }
+interface User { name: string; contact: string; reason: string; status: string; created: string }
+let edits: { id: string; zh?: string; sci: string; created: boolean; day: string; by: string }[] = [];
+let users: User[] = [];
+if (who) {
   const { results } = await env.DB.prepare(
-    `SELECT e.id, e.patch, e.created, e.updated, json_extract(s.doc, '$.zh') AS zh, json_extract(s.doc, '$.sci') AS sci
+    `SELECT e.id, e.patch, e.created, e.updated, e.by, json_extract(s.doc, '$.zh') AS zh, json_extract(s.doc, '$.sci') AS sci
      FROM edits e LEFT JOIN species s ON s.id = e.id ORDER BY e.updated DESC LIMIT 300`,
   ).all<Row>();
   edits = results.map((r) => {
     const patch = JSON.parse(r.patch) as { zh?: string | null; sci?: string };
-    return { id: r.id, zh: (patch.zh === null ? undefined : patch.zh) ?? r.zh ?? undefined, sci: patch.sci ?? r.sci ?? r.id, created: !!r.created, day: r.updated.slice(0, 10) };
+    return { id: r.id, zh: (patch.zh === null ? undefined : patch.zh) ?? r.zh ?? undefined, sci: patch.sci ?? r.sci ?? r.id, created: !!r.created, day: r.updated.slice(0, 10), by: r.by };
   });
+  if (who.role === 'admin') {
+    users = (await env.DB.prepare('SELECT name, contact, reason, status, created FROM users ORDER BY status DESC, created DESC LIMIT 500').all<User>()).results;
+  }
 }
+const pending = users.filter((u) => u.status === 'pending');
+const active = users.filter((u) => u.status === 'active');
 ---
 <Base title="维护" headerSearch={false}>
   <meta slot="head" name="robots" content="noindex" />
   <div class="wrap admin">
     <h1 class="page-title">维护</h1>
-    {!authed ? (
+    {!who ? (
       adminEnabled() ? (
-        <form class="admin-login" data-login>
-          <input type="password" name="password" placeholder="密码" autocomplete="current-password" required autofocus aria-label="密码" />
-          <button class="btn primary">登录</button>
-          <p class="form-msg" role="alert"></p>
-        </form>
-      ) : <p class="lead">后台还没有设置密码。</p>
+        <>
+          <form class="admin-login" data-login>
+            <input name="name" placeholder="名字" autocomplete="username" required autofocus aria-label="名字" />
+            <input type="password" name="password" placeholder="密码" autocomplete="current-password" required aria-label="密码" />
+            <button class="btn primary">登录</button>
+            <p class="form-msg" role="alert"></p>
+          </form>
+          <p class="note" style="margin-top:1.2rem">还不是维护者？<a href="/admin/apply">申请</a></p>
+        </>
+      ) : <p class="lead">后台还没有启用。</p>
     ) : (
       <>
         <div class="admin-find">
           <SearchBox autofocus placeholder="找一个物种来改：中文名、拼音、学名" />
           <a class="btn primary" href="/admin/edit">新建词条</a>
         </div>
+
+        {pending.length > 0 && (
+          <section class="section">
+            <h2>待处理的申请<span class="count">{pending.length}</span></h2>
+            <ul class="people">
+              {pending.map((u) => (
+                <li data-user={u.name}>
+                  <div><b>{u.name}</b><span>{u.contact}</span><span class="muted">{u.created.slice(0, 10)}</span></div>
+                  <p>{u.reason}</p>
+                  <div class="people-acts"><button type="button" class="btn primary" data-approve>通过</button><button type="button" class="btn" data-reject>拒绝</button></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section class="section">
-          <h2>改过的词条<span class="count">{edits.length}</span><button type="button" class="again" data-logout>退出</button></h2>
+          <h2>改过的词条<span class="count">{edits.length}</span><button type="button" class="again" data-logout>退出 {who.name}</button></h2>
           {edits.length ? (
             <ul class="admin-list">
               {edits.map((e) => (
@@ -49,13 +76,26 @@ if (authed) {
                   <a href={`/admin/edit?id=${e.id}`}>
                     {e.zh ? <span class="zh">{e.zh}</span> : <span class="zh only-sci">{e.sci}</span>}
                     {e.zh && <span class="sci">{e.sci}</span>}
-                    <span class="extra">{e.created && '新建 · '}{e.day}</span>
+                    <span class="extra">{e.created && '新建 · '}{e.by} · {e.day}</span>
                   </a>
                 </li>
               ))}
             </ul>
           ) : <p class="note">还没有。</p>}
         </section>
+
+        {active.length > 0 && (
+          <section class="section">
+            <h2>维护者<span class="count">{active.length}</span></h2>
+            <ul class="people">
+              {active.map((u) => (
+                <li data-user={u.name}>
+                  <div><b>{u.name}</b><span>{u.contact}</span><button type="button" class="btn danger" data-reject>移除</button></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </>
     )}
   </div>

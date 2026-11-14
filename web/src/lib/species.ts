@@ -15,8 +15,15 @@ export interface Species {
   traits?: [string, string][];
   /** 后台新建的词条，不来自数据管线。 */
   manual?: boolean;
-  img?: { url: string; thumb: string; page?: string; author: string; license: string; licenseUrl?: string; src: string };
+  /** 数据里带的图。 */
+  img?: Img;
+  /** 后台上传的图，按显示顺序。 */
+  imgs?: Img[];
 }
+export interface Img { url: string; thumb: string; page?: string; author: string; license: string; licenseUrl?: string; src: string }
+
+/** 一个物种的全部图片：后台上传的在前，数据里带的在后。第一张是首图。 */
+export const imagesOf = (sp: Pick<Species, 'img' | 'imgs'>): Img[] => [...(sp.imgs ?? []), ...(sp.img ? [sp.img] : [])];
 
 export const validId = (id: string) => /^[A-Za-z0-9_-]{3,90}$/.test(id);
 

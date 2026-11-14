@@ -7,8 +7,8 @@ import type { Species } from '../../../lib/species';
 export const prerender = false;
 
 export const GET: APIRoute = async ({ request, url, cookies }) => {
-  const denied = await guard(request, url, cookies.get(SESSION)?.value);
-  if (denied) return denied;
+  const who = await guard(request, url, cookies.get(SESSION)?.value);
+  if (who instanceof Response) return who;
   const name = url.searchParams.get('name') ?? '';
   if (!/^[A-Za-z][A-Za-z-]{1,40}$/.test(name)) return reply({}, 200);
   // id 是"属名_种加词"，按主键范围取同属的第一个

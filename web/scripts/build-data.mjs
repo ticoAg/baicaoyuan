@@ -74,6 +74,8 @@ const edits = loadEdits();
 const patches = new Map(edits.filter((e) => !e.created).map((e) => [e.id, e.patch]));
 const patched = (brief, patch) => {
   for (const f of BRIEF_FIELDS) if (f in patch) brief[f] = patch[f] ?? (f === 'alias' ? [] : undefined);
+  // 后台上传的图排在数据里的图前面，第一张是首图
+  if (patch.imgs?.length) brief.img = patch.imgs[0];
   return brief;
 };
 

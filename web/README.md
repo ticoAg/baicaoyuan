@@ -19,7 +19,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 | 物种页 `/s/{id}`、物种 JSON `/s/{id}.json` | Worker 按需渲染，数据读 D1，结果进边缘缓存 |
 | 搜索 | 浏览器里做，索引是一个静态文件 `/data/search.json` |
 | 首页的随机物种 | 浏览器里做：随机取一个 `/data/featured/{n}.json`（200 种），从里面挑 9 种 |
-| 维护后台 | `/admin/` 登录后新建词条、改名称和科属、上传图片。改动存在 D1 的 `edits` 表，图片存 R2 |
+| 维护后台 | `/admin/` 登录后新建词条、改名称和科属、上传图片；访客可以申请成为维护者。改动存在 D1 的 `edits` 表，图片存 R2 |
 | 拍照识别 | `/identify/` 把照片缩小后交给 `/api/identify`，Worker 转给 Pl@ntNet，再把候选学名对回 D1 里的物种 |
 
 ## 数据
@@ -35,7 +35,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
-D1 里有四张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记拍照识别当天的次数，`edits` 是后台的改动。同步脚本比对哈希，只写有变化的行：
+D1 里有六张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记当天的次数（拍照识别、登录试错、申请），`edits` 和 `edit_log` 是后台的改动与记录，`users` 是维护者。同步脚本比对哈希，只写有变化的行：
 
 ```bash
 npm run db:local     # 本地开发库，在 .wrangler/state 里
@@ -65,13 +65,20 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 
 ## 维护后台
 
-`/admin/` 用一个密码登录（Worker 的 secret `ADMIN_PASSWORD`，没设置时后台不可用）。能做的事：新建词条，改中文名和别名，改类型、科、属，上传一张图片。
+`/admin/` 有两种人：
+
+- 管理员只有一个，名字是 `admin`，密码是 Worker 的 secret `ADMIN_PASSWORD`。
+- 维护者在 `/admin/apply` 申请（名字、密码、联系方式、想维护什么），管理员在后台首页通过后才能登录。管理员可以随时移除维护者，移除后他的登录立刻失效。
+
+维护者能做的事：新建词条，改中文名和别名，改类型、科、属，上传图片（一个词条最多 8 张，第一张是首图）。放弃一个物种的全部改动、删除新建的词条，只有管理员能做。安全结论不在后台改。
 
 - 改动存在 `edits` 表，一个物种一行。已有的物种只存和数据不一样的字段，数据同步不会覆盖它，没改过的字段照常随数据更新；新建的词条整份存在这张表里。
+- 每次保存在 `edit_log` 表留一条记录：谁、什么时候、改成了什么。
 - 物种页和物种 JSON 在读取时合并改动，保存后马上生效（其他节点的边缘缓存最多一小时）。
 - 搜索索引是静态文件，改过的词条靠 `/api/overlay.json` 在浏览器里补上。
 - 分类页、专题、首页的随机物种是预渲染的，下次部署时由 `scripts/build-data.mjs` 并入改动。
-- 图片在浏览器里缩成 1600 和 500 两个尺寸，存进 R2 的 `baicaoyuan-images`，由 `/img/…` 读出。上传的图要写作者和许可。
+- 图片在浏览器里缩成 1600 和 500 两个尺寸，存进 R2 的 `baicaoyuan-images`，由 `/img/…` 读出。每张图都要写作者和许可。上传的图排在数据里的图前面。
+- 密码只存加盐的哈希（PBKDF2，再用 `SESSION_SECRET` 签一次）。登录状态是带签名的 cookie，不存会话。
 
 ## 部署
 
@@ -85,7 +92,7 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 | 构建命令 | `npm run build` |
 | 部署命令 | `npm run db:remote && npx wrangler deploy` |
 
-构建用的凭据要有 D1 的编辑权限。两个 secret 不进仓库，本地开发写在 `web/.dev.vars` 里：拍照识别用的 `PLANTNET_API_KEY`，后台密码 `ADMIN_PASSWORD`。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
+构建用的凭据要有 D1 的编辑权限。三个 secret 不进仓库，本地开发写在 `web/.dev.vars` 里：拍照识别用的 `PLANTNET_API_KEY`，管理员密码 `ADMIN_PASSWORD`，给登录状态签名的随机串 `SESSION_SECRET`（换掉它，所有人的登录和维护者的密码都会失效）。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
 
 ## 目录
 

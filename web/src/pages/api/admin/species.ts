@@ -1,19 +1,30 @@
 // 后台保存、删除一个词条的改动。
 //
 // 已有的物种只存和数据不一样的字段，所以数据更新时没改过的字段照常更新；
-// 新建的词条整份存在 edits 表里。图片存 R2，词条里记它的地址、作者和许可。
+// 新建的词条整份存在 edits 表里。图片存 R2，词条里记它们的地址、作者和许可，顺序就是显示的顺序。
+// 每次保存在 edit_log 里留一条记录。
 
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { guard, LICENSES, purge, reply, SESSION } from '../../../lib/admin';
 import { slugOf } from '../../../lib/shared.js';
-import { validId, type Species } from '../../../lib/species';
+import { validId, type Img, type Species } from '../../../lib/species';
 
 export const prerender = false;
 
 const MAX_IMAGE = 3 * 1024 * 1024;
+const MAX_IMAGES = 8;
 const TEXT = ['zh', 'fam', 'famZh', 'gen', 'genZh'] as const;
 
+interface ImageInput {
+  /** 已经传过的图，用它的地址指认。 */
+  url?: string;
+  /** 这次新传的图，在表单里叫 image{n} 和 thumb{n}。 */
+  file?: number;
+  author?: string;
+  license?: string;
+  page?: string;
+}
 interface Input {
   id?: string;
   sci?: string;
@@ -24,24 +35,28 @@ interface Input {
   famZh?: string;
   gen?: string;
   genZh?: string;
-  /** 图片的署名；null 表示去掉上传的图。 */
-  img?: { author?: string; license?: string; page?: string } | null;
+  images?: ImageInput[];
+  /** 不显示数据里自带的那张图。 */
+  hideDataImage?: boolean;
 }
-type Img = NonNullable<Species['img']>;
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 const latin = (v: unknown) => (/^[A-Za-z][A-Za-z-]{1,40}$/.test(text(v, 41)) ? text(v, 41) : '');
 const bad = (field: string) => reply({ error: 'invalid', field }, 400);
+const jpeg = (x: ArrayBuffer) => x.byteLength > 100 && x.byteLength <= MAX_IMAGE && new Uint8Array(x, 0, 2).join() === '255,216';
+const keyOf = (url: string) => url.slice('/img/'.length);
 
 async function removeImages(id: string, keep: string[] = []) {
   const { objects } = await env.IMAGES.list({ prefix: `${id}/` });
   const gone = objects.map((o) => o.key).filter((k) => !keep.includes(k));
   if (gone.length) await env.IMAGES.delete(gone);
 }
+const log = (id: string, who: string, at: string, patch: string | null) =>
+  env.DB.prepare('INSERT INTO edit_log (id, who, at, patch) VALUES (?1, ?2, ?3, ?4)').bind(id, who, at, patch);
 
 export const POST: APIRoute = async ({ request, url, cookies }) => {
-  const denied = await guard(request, url, cookies.get(SESSION)?.value);
-  if (denied) return denied;
+  const who = await guard(request, url, cookies.get(SESSION)?.value);
+  if (who instanceof Response) return who;
 
   const form = await request.formData().catch(() => null);
   let input: Input;
@@ -84,32 +99,34 @@ export const POST: APIRoute = async ({ request, url, cookies }) => {
   };
   if (!next.gen) return bad('gen');
 
-  // 图片：先核对署名，再存文件
-  let img = before.img?.src === 'upload' ? (before.img as Img) : undefined;
-  const file = form?.get('image');
-  const thumb = form?.get('thumb');
-  const upload = file instanceof File && thumb instanceof File ? [file, thumb] : null;
-  if (input.img === null) img = undefined;
-  if (img || upload) {
-    const credit = input.img ?? {};
-    const author = text(credit.author, 60) || (upload ? '' : img!.author);
-    const license = credit.license && credit.license in LICENSES ? credit.license : upload ? '' : img!.license;
+  // 图片：先把每一张核对完，再存文件
+  const had = new Map((before.imgs ?? []).map((im) => [im.url, im]));
+  const imgs: Img[] = [];
+  const uploads: [key: string, body: ArrayBuffer][] = [];
+  for (const item of (Array.isArray(input.images) ? input.images : []).slice(0, MAX_IMAGES)) {
+    const author = text(item.author, 60);
+    const license = item.license && item.license in LICENSES ? item.license : '';
     if (!author) return bad('author');
     if (!license) return bad('license');
-    const page = /^https?:\/\/\S+$/.test(text(credit.page, 300)) ? text(credit.page, 300) : undefined;
-    let { url: big, thumb: small } = img ?? { url: '', thumb: '' };
-    if (upload) {
-      const [a, b] = await Promise.all(upload.map((f) => f.arrayBuffer()));
-      const jpeg = (x: ArrayBuffer) => x.byteLength > 100 && x.byteLength <= MAX_IMAGE && new Uint8Array(x, 0, 2).join() === '255,216';
+    const page = /^https?:\/\/\S+$/.test(text(item.page, 300)) ? text(item.page, 300) : undefined;
+    let big: string;
+    let small: string;
+    if (typeof item.file === 'number') {
+      const files = [form?.get(`image${item.file}`), form?.get(`thumb${item.file}`)];
+      if (!(files[0] instanceof File) || !(files[1] instanceof File)) return bad('image');
+      const [a, b] = await Promise.all((files as File[]).map((f) => f.arrayBuffer()));
       if (!jpeg(a) || !jpeg(b)) return bad('image');
       const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', a)).slice(0, 6)].map((n) => n.toString(16).padStart(2, '0')).join('');
-      const keys = [`${id}/${hash}.jpg`, `${id}/${hash}-s.jpg`];
-      await Promise.all([a, b].map((x, i) => env.IMAGES.put(keys[i], x, { httpMetadata: { contentType: 'image/jpeg' } })));
-      [big, small] = keys.map((k) => `/img/${k}`);
-    }
-    img = { url: big, thumb: small, author, license, src: 'upload', ...(LICENSES[license] ? { licenseUrl: LICENSES[license] } : {}), ...(page ? { page } : {}) };
+      [big, small] = [`/img/${id}/${hash}.jpg`, `/img/${id}/${hash}-s.jpg`];
+      uploads.push([keyOf(big), a], [keyOf(small), b]);
+    } else if (item.url && had.has(item.url)) {
+      [big, small] = [item.url, had.get(item.url)!.thumb];
+    } else continue;
+    if (imgs.some((im) => im.url === big)) continue;
+    imgs.push({ url: big, thumb: small, author, license, src: 'upload', ...(LICENSES[license] ? { licenseUrl: LICENSES[license] } : {}), ...(page ? { page } : {}) });
   }
-  await removeImages(id, img ? [img.url, img.thumb].map((u) => u.slice('/img/'.length)) : []);
+  await Promise.all(uploads.map(([key, body]) => env.IMAGES.put(key, body, { httpMetadata: { contentType: 'image/jpeg' } })));
+  await removeImages(id, imgs.flatMap((im) => [keyOf(im.url), keyOf(im.thumb)]));
 
   // 新建的词条存整份；已有的只存和数据不一样的字段
   const patch: Record<string, unknown> = {};
@@ -121,28 +138,35 @@ export const POST: APIRoute = async ({ request, url, cookies }) => {
     if (was.k !== k) patch.k = k;
     for (const key of TEXT) if ((was[key] ?? '') !== next[key]) patch[key] = next[key] || null;
     if (JSON.stringify(was.alias ?? []) !== JSON.stringify(next.alias)) patch.alias = (next.alias as string[]).length ? next.alias : null;
+    if (input.hideDataImage && was.img) patch.img = null;
   }
-  if (img) patch.img = img;
+  if (imgs.length) patch.imgs = imgs;
 
-  if (!created && !Object.keys(patch).length) await env.DB.prepare('DELETE FROM edits WHERE id = ?1').bind(id).run();
-  else {
-    await env.DB.prepare(
-      'INSERT INTO edits (id, patch, created, updated) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (id) DO UPDATE SET patch = excluded.patch, updated = excluded.updated',
-    )
-      .bind(id, JSON.stringify(patch), created ? 1 : 0, new Date().toISOString())
-      .run();
+  const now = new Date().toISOString();
+  if (!created && !Object.keys(patch).length) {
+    if (row?.patch) await env.DB.batch([env.DB.prepare('DELETE FROM edits WHERE id = ?1').bind(id), log(id, who.name, now, null)]);
+  } else {
+    const body = JSON.stringify(patch);
+    if (body !== row?.patch) {
+      await env.DB.batch([
+        env.DB.prepare(
+          'INSERT INTO edits (id, patch, created, updated, by) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (id) DO UPDATE SET patch = excluded.patch, updated = excluded.updated, by = excluded.by',
+        ).bind(id, body, created ? 1 : 0, now, who.name),
+        log(id, who.name, now, body),
+      ]);
+    }
   }
   await purge(url, id);
   return reply({ id }, 200);
 };
 
-/** 放弃对一个物种的改动；新建的词条则整个删除。 */
+/** 放弃对一个物种的全部改动；新建的词条则整个删除。只有管理员能做。 */
 export const DELETE: APIRoute = async ({ request, url, cookies }) => {
-  const denied = await guard(request, url, cookies.get(SESSION)?.value);
-  if (denied) return denied;
+  const who = await guard(request, url, cookies.get(SESSION)?.value, true);
+  if (who instanceof Response) return who;
   const id = url.searchParams.get('id') ?? '';
   if (!validId(id)) return bad('id');
-  await env.DB.prepare('DELETE FROM edits WHERE id = ?1').bind(id).run();
+  await env.DB.batch([env.DB.prepare('DELETE FROM edits WHERE id = ?1').bind(id), log(id, who.name, new Date().toISOString(), null)]);
   await removeImages(id);
   await purge(url, id);
   return reply({ ok: true }, 200);

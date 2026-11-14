@@ -26,8 +26,10 @@ declare module 'cloudflare:workers' {
     };
     /** Pl@ntNet 的 API key。线上是 Worker 的 secret，本地放在 .dev.vars。 */
     PLANTNET_API_KEY?: string;
-    /** 维护后台的密码。同上。没有设置时后台不可用。 */
+    /** 管理员（名字是 admin）的密码。同上。 */
     ADMIN_PASSWORD?: string;
+    /** 给登录状态签名、给密码哈希加料用的随机串。同上。这两个没有设置时后台不可用。 */
+    SESSION_SECRET?: string;
   };
 }
 

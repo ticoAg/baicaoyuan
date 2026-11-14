@@ -5,7 +5,7 @@ import Base from '../../layouts/Base.astro';
 import Level from '../../components/Level.astro';
 import sources from '../../generated/sources.json';
 import { glyphSvg, PROVINCE_TILES, REGIONS, SITE } from '../../lib/shared.js';
-import { loadSpecies, notFound, REDLIST, src, unavailable, verdict } from '../../lib/species';
+import { imagesOf, loadSpecies, notFound, REDLIST, src, unavailable, verdict } from '../../lib/species';
 
 export const prerender = false;
 
@@ -53,8 +53,10 @@ const used = new Set<string>([
   ...(uses.length ? ['cn_useful'] : []),
   ...(sp.traits?.length ? ['wikidata'] : []),
   ...(sp.wd ? ['wikidata'] : []),
-  ...(sp.img ? [sp.img.src] : []),
+  ...imagesOf(sp).map((im) => im.src),
 ]);
+const images = imagesOf(sp);
+const imgSite = (im: (typeof images)[number]) => (im.src === 'inat' ? 'iNaturalist' : im.src === 'upload' ? '来源' : 'Wikimedia Commons');
 const usedSources = sources.filter((s) => used.has(s.id));
 const famPath = `/t/${sp.fam ?? '未定科'}/`;
 const issue = `${SITE.repo}/issues/new?title=${encodeURIComponent(`纠错：${title}（${sp.sci}）`)}&body=${encodeURIComponent(`页面：${Astro.url.origin}/s/${sp.id}\n\n哪里不对：\n\n依据（文献、链接）：\n`)}`;
@@ -106,13 +108,24 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
         </section>
         {fungus && <p class="fixed-warning">颜色、银针、虫咬都不能用来判断蘑菇有没有毒。</p>}
 
-        {sp.img && (
-          <figure class="figure">
-            <img src={sp.img.url} alt={`${title}的照片`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').hidden=true" />
-            <figcaption>
-              图：{sp.img.author} · {sp.img.licenseUrl ? <a href={sp.img.licenseUrl} rel="license noopener">{sp.img.license}</a> : sp.img.license}
-              {sp.img.page && <> · <a href={sp.img.page} rel="noopener">{sp.img.src === 'inat' ? 'iNaturalist' : sp.img.src === 'upload' ? '来源' : 'Wikimedia Commons'}</a></>}
-            </figcaption>
+        {images.length > 0 && (
+          <figure class="figure" data-gallery>
+            <img src={images[0].url} alt={`${title}的照片`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').hidden=true" />
+            {images.map((im, i) => (
+              <figcaption hidden={i > 0}>
+                图：{im.author} · {im.licenseUrl ? <a href={im.licenseUrl} rel="license noopener">{im.license}</a> : im.license}
+                {im.page && <> · <a href={im.page} rel="noopener">{imgSite(im)}</a></>}
+              </figcaption>
+            ))}
+            {images.length > 1 && (
+              <div class="thumbs">
+                {images.map((im, i) => (
+                  <a href={im.url} aria-current={i === 0 ? 'true' : undefined} aria-label={`第 ${i + 1} 张`}>
+                    <img src={im.thumb} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement.hidden=true" />
+                  </a>
+                ))}
+              </div>
+            )}
           </figure>
         )}
 
@@ -259,6 +272,19 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
     </div>
   </div>
   <script is:inline>
+    // 多张图时，点缩略图换大图和署名
+    for (const fig of document.querySelectorAll('[data-gallery]')) {
+      const thumbs = [...fig.querySelectorAll('.thumbs a')];
+      const caps = fig.querySelectorAll('figcaption');
+      thumbs.forEach((a, i) =>
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          fig.querySelector('img').src = a.href;
+          caps.forEach((c, k) => (c.hidden = k !== i));
+          thumbs.forEach((t, k) => (k === i ? t.setAttribute('aria-current', 'true') : t.removeAttribute('aria-current')));
+        }),
+      );
+    }
     if (document.cookie.includes('bcy_m=1')) for (const el of document.querySelectorAll('[data-admin-only]')) el.hidden = false;
   </script>
 </Base>
