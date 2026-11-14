@@ -17,7 +17,7 @@ export const LEVELS = {
   limited: { rank: 4, glyph: '◑', label: '少量', tone: 'warn', hint: '过量有害，或对部分人群有害' },
   processed: { rank: 3, glyph: '◐', label: '处理后可食', tone: 'ok', hint: '必须经过指定处理' },
   edible: { rank: 2, glyph: '●', label: '可食', tone: 'ok', hint: '有可靠的食用记录，且该部位无毒性记录' },
-  food_record: { rank: 1, glyph: '◌', label: '有食用记录', tone: 'muted', hint: '有文献记载食用，未经审核，不能据此食用' },
+  food_record: { rank: 1, glyph: '◌', label: '有食用记录', tone: 'muted', hint: '有文献记载食用，不能据此食用' },
   unknown: { rank: 0, glyph: '○', label: '未知', tone: 'muted', hint: '没有足够证据，不要吃' },
 };
 

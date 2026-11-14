@@ -40,7 +40,7 @@ SOURCES: list[Source] = [
         title="Wikidata",
         license="CC0 1.0",
         url="https://www.wikidata.org/",
-        version="QLever 镜像，抓取当日",
+        version="",
         citation="Wikidata contributors.",
     ),
     Source(
@@ -77,7 +77,6 @@ SOURCES: list[Source] = [
         title="食品原料整合查詢平臺（台湾食药署）",
         license="政府資料開放授權條款－第 1 版",
         url="https://data.gov.tw/dataset/8452",
-        version="抓取当日",
         citation="衛生福利部食品藥物管理署. 食品原料整合查詢平臺.",
         files={"tw_fda_food_ingredients.csv": "https://data.fda.gov.tw/data/opendata/export/4/csv"},
     ),
@@ -113,14 +112,12 @@ SOURCES: list[Source] = [
         title="Wikimedia Commons",
         license="逐个文件授权（CC0 / 公有领域 / CC BY / CC BY-SA）",
         url="https://commons.wikimedia.org/",
-        version="抓取当日",
     ),
     Source(
         id="inat",
         title="iNaturalist",
-        license="逐张照片授权（只取 CC0 / 公有领域 / CC BY / CC BY-SA）",
+        license="逐张照片授权（CC0 / 公有领域 / CC BY / CC BY-SA）",
         url="https://www.inaturalist.org/",
-        version="抓取当日",
         files={"inat_taxa.csv.gz": "https://inaturalist-open-data.s3.amazonaws.com/taxa.csv.gz"},
     ),
 ]
