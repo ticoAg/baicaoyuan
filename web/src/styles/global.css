@@ -104,7 +104,7 @@ small, .small { font-size: 0.82rem; }
 .search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .search kbd { position: absolute; right: 0.8rem; top: 50%; translate: 0 -50%; font: 0.72rem var(--mono); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 0.35rem; pointer-events: none; }
 .search-panel {
-  position: absolute; left: 0; right: 0; top: calc(100% + 0.4rem);
+  position: absolute; left: 0; right: 0; top: calc(100% + 0.4rem); z-index: 10;
   background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.14); max-height: min(70vh, 34rem); overflow: auto; padding: 0.3rem;
 }
