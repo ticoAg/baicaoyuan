@@ -44,7 +44,7 @@ npm run db:remote    # 线上库
 
 物种页和物种 JSON 走 Cache API（`src/middleware.ts`），一小时过期，所以线上数据更新后最多一小时生效。
 
-- Cache API 只在自定义域名上生效，`workers.dev` 上不起作用。
+- Cache API 只在自定义域名上生效，所以 `workers.dev` 地址关掉了，只留 <https://plants.ticoag.fun>。
 - 命中缓存时 Worker 仍会执行，省的是数据库读取和渲染，不省请求次数。
 - 没有开 Workers Cache：开启后静态文件请求也计入 Worker 请求数。
 
@@ -61,12 +61,17 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 
 ## 部署
 
-两种方式，任选其一。两种都需要凭据有 D1 的编辑权限。
+线上地址 <https://plants.ticoag.fun>，域名写在 `wrangler.jsonc` 的 `routes` 里。
 
-- **Workers Builds**：在 Cloudflare 控制台把这个仓库连到一个 Worker，根目录填 `web`，构建命令 `npm run build`，部署命令 `npm run db:remote && npx wrangler deploy`。
-- **GitHub Actions**：在仓库的 Secrets 里加 `CLOUDFLARE_API_TOKEN`（权限：Workers Scripts 编辑、D1 编辑）和 `CLOUDFLARE_ACCOUNT_ID`，`.github/workflows/web.yml` 会在 main 更新时同步数据并部署。
+用 Cloudflare 的 Workers Builds 自动部署：`main` 上 `web/` 或 `data/snapshot/` 有改动时触发。
 
-`workers.dev` 域名在中国大陆无法访问，面向大陆用户需要绑定自己的域名。绑定后可以用仓库变量 `SITE_URL` 设置站点地址。
+| 项 | 值 |
+|---|---|
+| 根目录 | `web` |
+| 构建命令 | `npm run build` |
+| 部署命令 | `npm run db:remote && npx wrangler deploy` |
+
+构建用的凭据要有 D1 的编辑权限。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
 
 ## 目录
 
