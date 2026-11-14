@@ -510,7 +510,7 @@ class Build:
             n += 1
             self.hazards.append({
                 "taxon_id": pick[0], "level": "toxic", "part": None, "label": "有毒",
-                "note": "名录只列物种，未注明有毒部位与毒性强弱", "toxins": None,
+                "note": "未注明有毒部位与毒性强弱", "toxins": None,
                 "source": "cn_toxic_1997", "reference": f"原文：{re.sub(r'\\s+', ' ', str(line)).strip()}",
             })
         print(f"中国有毒植物参考种 匹配 {n}/{total}")
@@ -668,7 +668,7 @@ class Build:
         for tid, r in hit.items():
             self.hazards.append({
                 "taxon_id": tid, "level": "suspect", "part": None, "label": "名称提示有毒",
-                "note": f"{'中文名' if r['kind'] == 'primary' else '别名'}「{r['name']}」。只是提示，没有毒性分级",
+                "note": f"{'中文名' if r['kind'] == 'primary' else '别名'}「{r['name']}」",
                 "toxins": None, "source": r["source"], "reference": None,
             })
         print("名称提示有毒", len(hit))

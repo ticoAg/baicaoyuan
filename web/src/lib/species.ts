@@ -50,6 +50,7 @@ export const SOURCE_SHORT: Record<string, string> = {
   cn_toxic_1997: '中国有毒植物参考种（1997）',
   xsbn: '西双版纳数据集',
   commons: 'Wikimedia Commons',
+  inat: 'iNaturalist',
 };
 export const src = (id: string) => SOURCE_SHORT[id] ?? id;
 
@@ -72,18 +73,18 @@ export function verdict(sp: Species) {
   if (sp.safety === 'deadly' || sp.safety === 'toxic' || sp.safety === 'suspect') {
     for (const h of hazards) {
       const where = [h.part, h.note].filter(Boolean).join('，');
-      lines.push(h.lv === 'suspect' ? `${h.label}：${h.note}。不要吃。` : `${where ? where + '：' : ''}${h.label}（${src(h.src)}）`);
+      lines.push(h.lv === 'suspect' ? `${h.label}：${h.note}。没有毒性记录，不要吃。` : `${where ? where + '：' : ''}${h.label}（${src(h.src)}）`);
     }
     if (foodSources.length)
-      tail = `另有食用记录（${foodSources.map(src).join('、')}）。同一种植物的不同部位、不同处理方式，结论可能不同；未经审核前按最严的一档显示。`;
+      tail = `另有食用记录（${foodSources.map(src).join('、')}）。不同部位、不同处理方式的结论可能不同，这里按最严的显示。`;
   } else if (sp.safety === 'restricted') {
     lines.push('台湾食药署：未确认食用安全性前，不得作为食品原料使用。');
-    if (foodSources.length) tail = `另有食用记录（${foodSources.map(src).join('、')}），未经审核。`;
+    if (foodSources.length) tail = `另有食用记录（${foodSources.map(src).join('、')}）。`;
   } else if (sp.safety === 'food_record') {
-    lines.push(`有文献或清单记载食用（${foodSources.map(src).join('、')}）。记载不等于安全：本条目未经人工审核，不能据此食用。`);
+    lines.push(`有文献或清单记载食用（${foodSources.map(src).join('、')}）。有记载不等于安全，不能据此食用。`);
     if (okParts.length) tail = `清单里列出的部位：${okParts.join('；')}。`;
   } else {
-    lines.push('没有足够的证据说明它能不能吃。不要吃。');
+    lines.push('没有证据说明它能不能吃。');
   }
   return { lv, lines, tail, reviewed: false };
 }

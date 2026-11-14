@@ -98,7 +98,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
       <article>
         <section class={`verdict tone-${v.lv.tone}`} aria-label="安全结论">
           <span class="glyph" set:html={glyphSvg(sp.safety)} />
-          <p class="headline">{v.lv.label}{sp.safety === 'unknown' && <> · 不要吃</>}<small>{sp.safety === 'food_record' ? '未经审核，不能据此食用' : sp.safety === 'unknown' ? '' : '机器合并，未经人工审核'}</small></p>
+          <p class="headline">{v.lv.label}{sp.safety === 'unknown' && <> · 不要吃</>}{sp.safety === 'food_record' && <small>不能据此食用</small>}</p>
           <div class="body">
             {v.lines.map((l) => <p>{l}</p>)}
             {v.tail && <p class="small">{v.tail}</p>}
@@ -118,7 +118,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
 
         {rows.length > 0 && (
           <section class="section">
-            <h2>各部位 <span class="count">能不能吃、有什么记录</span></h2>
+            <h2>各部位</h2>
             <div class="table-scroll">
               <table class="data parts">
                 <thead><tr><th>部位</th><th>结论</th><th>记录</th><th>备注</th><th>出处</th></tr></thead>
@@ -135,13 +135,13 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
                 </tbody>
               </table>
             </div>
-            <p class="note">这些是各来源的原始记录，每条只有一个来源，未经人工审核。没有列出的部位按"未知，不要吃"对待。</p>
+            <p class="note">没有列出的部位，按"不要吃"对待。</p>
           </section>
         )}
 
         {sp.traits?.length ? (
           <section class="section">
-            <h2>怎么认 <span class="count">形态特征</span></h2>
+            <h2>怎么认</h2>
             <table class="data">
               <tbody>
                 {[...new Set(sp.traits.map((t) => t[0]))].map((name) => (
@@ -149,13 +149,13 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
                 ))}
               </tbody>
             </table>
-            <p class="note">来自 Wikidata，只能用来缩小范围，不能用来确认物种。</p>
+            <p class="note">只能用来缩小范围，不能据此确认物种。</p>
           </section>
         ) : null}
 
         {(flags.length > 0 || uses.length > 0) && (
           <section class="section">
-            <h2>用途记录 <span class="count">有记载即列出，不代表安全</span></h2>
+            <h2>用途记录</h2>
             {flags.length > 0 && (
               <p>{flags.map((f) => <span class="chip">{f.f} <span class="muted small">{f.src.map(src).join('、')}</span></span>)}</p>
             )}
@@ -179,12 +179,13 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
                 <ol>{flags.find((f) => f.f === '食用' && f.ref)!.ref!.split(/;\s+/).map((r) => <li>{r}</li>)}</ol>
               </details>
             )}
+            <p class="note">有记载不代表安全。</p>
           </section>
         )}
 
         {sp.k === 'plant' && (
           <section class="section">
-            <h2>哪里有 <span class="count">中国境内的分布</span></h2>
+            <h2>哪里有</h2>
             {dist.size ? (
               <div class="dist">
                 <div>
@@ -198,11 +199,11 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
                 <div>
                   {regionNames('n').length > 0 && <p><strong>原生</strong>　{regionNames('n').join('、')}</p>}
                   {regionNames('i').length > 0 && <p><strong>引入</strong>　{regionNames('i').join('、')}</p>}
-                  <p class="note">精度是 TDWG 三级区：中国分成 10 个大区，同一大区里的省份一起着色，不代表每个省都有。来源：WCVP。</p>
+                  <p class="note">分布按大区记录，同一大区的省份一起着色，不代表每个省都有。</p>
                 </div>
               </div>
             ) : (
-              <p class="note">WCVP 没有记录它在中国的野生分布。它出现在这里，是因为中文来源提到了它，多半是栽培或进口的植物。</p>
+              <p class="note">没有它在中国野生分布的记录，多为栽培或进口的植物。</p>
             )}
           </section>
         )}
@@ -214,7 +215,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
               <li><a href={s.url} rel="noopener">{s.title}</a>{s.version && <span class="muted">（{s.version}）</span>} · {s.license}</li>
             ))}
           </ol>
-          <p class="note">本页由开放数据自动合并生成。发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
+          <p class="note">以上内容尚未经人工审核。发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
         </section>
       </article>
 
@@ -246,7 +247,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
         <section>
           <h2>本页数据</h2>
           <ul>
-            <li><a href={`/s/${sp.id}.json`}>JSON</a> <span class="muted small">各条记录按其来源的许可</span></li>
+            <li><a href={`/s/${sp.id}.json`}>JSON</a></li>
             <li><a href={issue} rel="noopener">纠错</a></li>
           </ul>
         </section>

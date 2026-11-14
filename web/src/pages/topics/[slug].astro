@@ -19,7 +19,7 @@ for (const it of t.items) {
     <h1 class="page-title">{t.title}</h1>
     <p class="lead">{t.lead}</p>
     <p class="note">{t.source}</p>
-    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /> <span class="muted small" style="margin-left:0.6rem">{t.items.length.toLocaleString('zh-CN')} 种，按科排列</span></p>
+    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /> <span class="muted small" style="margin-left:0.6rem">{t.items.length.toLocaleString('zh-CN')} 种</span></p>
     <div class="topic-groups">
       {[...groups].map(([fam, items]) => (
         <div data-group>
