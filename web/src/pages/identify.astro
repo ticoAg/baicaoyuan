@@ -1,0 +1,31 @@
+---
+import Base from '../layouts/Base.astro';
+import Camera from '../components/Camera.astro';
+---
+<Base title="拍照识别" description="拍一张叶、花或果的照片，看看它可能是哪种植物，以及它的安全等级。" current="/identify/">
+  <div class="wrap page-identify">
+    <h1 class="page-title">拍照识别</h1>
+    <p class="lead">拍一张叶、花或果，看看它可能是什么。只认植物，不认蘑菇。</p>
+
+    <div class="identify" data-identify>
+      <div class="shot">
+        <label class="shoot">
+          <input type="file" accept="image/*" multiple class="visually-hidden" />
+          <span class="shoot-face">
+            <Camera size={34} />
+            <b>拍照或选照片</b>
+            <small>同一株植物最多 4 张</small>
+          </span>
+        </label>
+        <div class="shot-photos" hidden></div>
+      </div>
+      <div class="cands" aria-live="polite"></div>
+    </div>
+
+    <p class="note identify-note">结果只是候选，不能凭照片判断能不能吃。照片会发给 <a href="https://plantnet.org/" rel="noopener">Pl@ntNet</a> 做识别，本站不保存。</p>
+    <noscript><p class="note">拍照识别需要启用 JavaScript。</p></noscript>
+  </div>
+  <script>
+    import '../scripts/identify.ts';
+  </script>
+</Base>

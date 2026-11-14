@@ -1,11 +1,13 @@
 ---
 import '../styles/global.css';
+import Camera from '../components/Camera.astro';
 import SearchBox from '../components/SearchBox.astro';
 import { SITE } from '../lib/shared.js';
 interface Props { title?: string; description?: string; headerSearch?: boolean; current?: string }
 const { title, description = '开源的中文植物与真菌图鉴：这是什么、能不能吃、怎么处理。每条结论带出处。', headerSearch = true, current } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} · ${SITE.tagline}`;
 const nav = [
+  ['/identify/', '识别'],
   ['/topics/', '专题'],
   ['/t/', '分类'],
   ['/about/', '关于'],
@@ -33,6 +35,7 @@ const nav = [
           {nav.map(([href, label]) => <a href={href} aria-current={current === href ? 'page' : undefined}>{label}</a>)}
         </nav>
         {headerSearch && <SearchBox />}
+        {headerSearch && current !== '/identify/' && <a class="shoot-icon" href="/identify/" aria-label="拍照识别"><Camera size={22} /></a>}
       </div>
     </header>
     <main>

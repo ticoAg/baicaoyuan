@@ -191,7 +191,10 @@ table.parts td:nth-child(5) { min-width: 9rem; }
 .hero h1 em { font-style: normal; color: var(--accent); }
 .hero h1 span { white-space: nowrap; }
 .hero .lead { margin-top: 0.9rem; font-size: 1.12rem; }
-.hero .search { max-width: 40rem; margin: 1.8rem 0 0.8rem; }
+.hero-find { display: flex; gap: 0.6rem; max-width: 42rem; margin: 1.8rem 0 0.8rem; }
+.hero-find .search { margin: 0; max-width: none; }
+.shoot-link { display: inline-flex; align-items: center; gap: 0.45rem; height: 3.3rem; padding: 0 1.25rem; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--accent-ink); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.shoot-link:hover { border-color: var(--accent); background: var(--accent-wash); }
 .hero .search input { height: 3.3rem; font-size: 1.1rem; padding-left: 1.3rem; }
 .hero .tries { font-size: 0.9rem; color: var(--ink-3); margin: 0; }
 .hero .tries a { margin-right: 0.9rem; }
@@ -295,6 +298,44 @@ details.refs li { margin-bottom: 0.25rem; overflow-wrap: anywhere; }
 .page-search .search input { height: 3rem; font-size: 1.05rem; }
 .page-search .hit { border-bottom: 1px solid var(--rule-2); border-radius: 0; padding: 0.7rem 0.4rem; }
 
+/* 拍照识别 */
+.shoot-icon { display: none; color: var(--ink-2); }
+.identify { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 2.5rem; align-items: start; margin-top: 1.6rem; }
+.identify:not(.has-photo) { grid-template-columns: minmax(0, 34rem); }
+.shot { display: grid; gap: 0.8rem; justify-items: start; }
+.shot-photos { order: -1; width: 100%; display: grid; gap: 0.3rem; border-radius: 10px; overflow: hidden; transition: opacity 0.2s; }
+.shot-photos[hidden] { display: none; }
+.shot-photos:not([data-n='1']) { grid-template-columns: 1fr 1fr; }
+.shot-photos img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.shot-photos[data-n='1'] img { aspect-ratio: auto; max-height: 28rem; }
+.shot-photos[data-n='3'] img:first-child { grid-column: span 2; aspect-ratio: 2; }
+.busy .shot-photos { opacity: 0.55; }
+.shoot { cursor: pointer; }
+.identify:not(.has-photo) .shoot { width: 100%; }
+.shoot-face { display: grid; justify-items: center; gap: 0.35rem; padding: 3.2rem 1rem; border: 1.5px dashed var(--rule); border-radius: 10px; background: var(--surface); color: var(--accent-ink); }
+.shoot:hover .shoot-face, .shoot input:focus-visible + .shoot-face { border-color: var(--accent); background: var(--accent-wash); }
+.shoot-face b { font-size: 1.1rem; }
+.shoot-face small { color: var(--ink-3); }
+.has-photo .shoot-face { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.4rem 1.1rem; border-style: solid; border-width: 1px; border-radius: 999px; }
+.has-photo .shoot-face svg { width: 1.2rem; height: 1.2rem; }
+.has-photo .shoot-face b { font-size: 0.95rem; }
+.has-photo .shoot-face small { display: none; }
+.cands-msg { color: var(--ink-2); margin: 0.3rem 0 0.8rem; }
+.cand-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.cand { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr) auto; gap: 0.15rem 0.9rem; align-items: center; padding: 0.8rem 0.4rem; border-bottom: 1px solid var(--rule-2); color: var(--ink); text-decoration: none; }
+a.cand:hover { background: var(--accent-wash); }
+.cand-img { grid-row: 1 / 5; align-self: start; aspect-ratio: 1; border-radius: var(--radius); overflow: hidden; background: var(--muted-wash); }
+.cand-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cand-name { font: 700 1.15rem var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cand-lv { justify-self: end; font-size: 0.82rem; color: var(--ink-3); }
+.cand-sub { grid-column: 2 / 4; font-size: 0.84rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cand-meter { grid-column: 2 / 4; display: flex; align-items: center; gap: 0.7rem; font-size: 0.8rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cand-score { flex: 1; height: 4px; border-radius: 2px; background: var(--rule-2); overflow: hidden; }
+.cand-score span { display: block; height: 100%; background: var(--accent); }
+.cand-credit { grid-column: 2 / 4; font-size: 0.7rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cand.unknown .cand-name { color: var(--ink-2); }
+.identify-note { margin-top: 2rem; max-width: 46rem; }
+
 /* 页脚 */
 .site-footer { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; font-size: 0.86rem; color: var(--ink-3); }
 .site-footer .wrap { display: grid; grid-template-columns: 1fr auto; gap: 1rem 3rem; }
@@ -314,6 +355,12 @@ details.refs li { margin-bottom: 0.25rem; overflow-wrap: anywhere; }
   .sp-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
   .sp-aside { position: static; }
   .site-nav { display: none; }
+  .shoot-icon { display: inline-flex; }
+  .site-header .wrap { gap: 0.9rem; }
+  .identify { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .shot-photos[data-n='1'] img { height: 15rem; max-height: none; object-fit: cover; }
+  .shot-photos:not([data-n='1']) img { aspect-ratio: 3 / 2; }
+  .shot-photos[data-n='3'] img:first-child { aspect-ratio: 3; }
   .dist { grid-template-columns: 1fr; gap: 1rem; }
   .site-footer .wrap { grid-template-columns: 1fr; }
 }
@@ -330,5 +377,7 @@ details.refs li { margin-bottom: 0.25rem; overflow-wrap: anywhere; }
   .page-title { font-size: 1.8rem; }
   .use { grid-template-columns: 1fr; }
   .search kbd { display: none; }
+  .shoot-link { width: 3.3rem; padding: 0; justify-content: center; flex: none; }
+  .shoot-link span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .legend li { grid-template-columns: 7.5rem 1fr; }
 }

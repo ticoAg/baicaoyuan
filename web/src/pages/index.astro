@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Camera from '../components/Camera.astro';
 import SearchBox from '../components/SearchBox.astro';
 import Level from '../components/Level.astro';
 import stats from '../generated/stats.json';
@@ -15,7 +16,10 @@ const legend = ['edible', 'processed', 'limited', 'toxic', 'deadly', 'suspect', 
       <div>
         <h1><span>这是什么，</span><span><em>能不能吃</em>，</span><span>怎么处理</span></h1>
         <p class="lead">开源的中文植物与真菌图鉴。能不能吃，按部位给出结论，每条都有出处。</p>
-        <SearchBox autofocus placeholder="搜一种植物或蘑菇：马齿苋 / mcx / Portulaca" />
+        <div class="hero-find">
+          <SearchBox autofocus placeholder="搜一种植物或蘑菇：马齿苋 / mcx / Portulaca" />
+          <a class="shoot-link" href="/identify/"><Camera /><span>拍照识别</span></a>
+        </div>
         <p class="tries">试试　{tries.map(([t, href]) => <a href={href}>{t}</a>)}</p>
       </div>
       <a class="pick big" data-slot="big" aria-hidden="true" tabindex="-1"><span class="pick-img"></span></a>

@@ -19,6 +19,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 | 物种页 `/s/{id}`、物种 JSON `/s/{id}.json` | Worker 按需渲染，数据读 D1，结果进边缘缓存 |
 | 搜索 | 浏览器里做，索引是一个静态文件 `/data/search.json` |
 | 首页的随机物种 | 浏览器里做：随机取一个 `/data/featured/{n}.json`（200 种），从里面挑 9 种 |
+| 拍照识别 | `/identify/` 把照片缩小后交给 `/api/identify`，Worker 转给 Pl@ntNet，再把候选学名对回 D1 里的物种 |
 
 ## 数据
 
@@ -33,7 +34,7 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
-D1 里只有两张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间。同步脚本比对哈希，只写有变化的行：
+D1 里有三张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记拍照识别当天的次数。同步脚本比对哈希，只写有变化的行：
 
 ```bash
 npm run db:local     # 本地开发库，在 .wrangler/state 里
@@ -73,7 +74,7 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 | 构建命令 | `npm run build` |
 | 部署命令 | `npm run db:remote && npx wrangler deploy` |
 
-构建用的凭据要有 D1 的编辑权限。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
+构建用的凭据要有 D1 的编辑权限。拍照识别用的 Pl@ntNet API key 是 Worker 的 secret `PLANTNET_API_KEY`，不进仓库；本地开发写在 `web/.dev.vars` 里。换域名时改 `wrangler.jsonc` 的 `routes` 和 `astro.config.mjs` 的 `site`。
 
 ## 目录
 

@@ -10,3 +10,11 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) WITHOUT ROWID;
+
+-- 拍照识别的每日用量。who 是访客标识的哈希，'*' 是全站合计；只留当天的行。
+CREATE TABLE IF NOT EXISTS usage (
+  day TEXT NOT NULL,
+  who TEXT NOT NULL,
+  n   INTEGER NOT NULL,
+  PRIMARY KEY (day, who)
+) WITHOUT ROWID;

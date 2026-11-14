@@ -14,3 +14,6 @@ web/src/generated/
 web/public/data/
 web/.data/
 .DS_Store
+
+# 本地密钥
+web/.dev.vars
