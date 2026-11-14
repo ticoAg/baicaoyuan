@@ -287,3 +287,11 @@ TW_FDA_SUBCAT = {
     "菇蕈類及其來源製取之原料": "菇蕈类及其制取的原料",
     "藻類及其來源製取之原料": "藻类及其制取的原料",
 }
+
+# ── iNaturalist 照片许可：只收这几种 ─────────────────────────────────
+INAT_LICENSE = {
+    "cc0": ("CC0 1.0", "https://creativecommons.org/publicdomain/zero/1.0/"),
+    "pd": ("公有领域", None),
+    "cc-by": ("CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/"),
+    "cc-by-sa": ("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"),
+}

@@ -2,10 +2,12 @@
 //
 //   .data/species.ndjson        物种详情，一行一个物种；由 scripts/db-sync.mjs 灌进 D1
 //   public/data/search.json     浏览器内搜索索引
+//   public/data/featured/*.json 首页随机展示用的物种，分成小文件，一次取一个
 //   src/generated/*.json        预渲染页面（分类、专题、关于）在构建时读取
 //
 // 数据目录可以用环境变量 BCY_DATA_DIR 指到别处。
 
+import { createHash } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -79,7 +81,7 @@ for (const t of taxa) {
     if (!x.src.includes(f.source)) x.src.push(f.source);
     if (f.reference) x.ref = f.reference;
   }
-  const img = (G.images.get(id) ?? []).filter((i) => i.author && i.license)[0];
+  const img = (G.images.get(id) ?? []).filter((i) => i.url && i.author && i.license)[0];
 
   const doc = compact({
     id, k: t.kingdom, sci: t.sci, au: t.authors, zh: t.zh, alias,
@@ -93,10 +95,10 @@ for (const t of taxa) {
     refs,
     flags: [...flagMap.values()],
     traits: (G.traits.get(id) ?? []).map((x) => [x.trait, x.value]),
-    img: img && compact({ file: img.file, author: img.author, license: img.license, licenseUrl: img.license_url }),
+    img: img && compact({ url: img.url, thumb: img.thumb, page: img.page, author: img.author, license: img.license, licenseUrl: img.license_url, src: img.source }),
   });
   docs.push(JSON.stringify(doc));
-  briefs.push({ id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, hasImg: !!img });
+  briefs.push({ id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, img });
 }
 
 await rm(PUB, { recursive: true, force: true });
@@ -214,6 +216,18 @@ const topics = [
 ].map((t) => ({ ...t, items: t.items.sort((a, b) => a[4].localeCompare(b[4], 'zh-Hans-CN') || String(a[1]).localeCompare(String(b[1]), 'zh-Hans-CN')) }));
 await writeFile(path.join(GEN, 'topics.json'), JSON.stringify(topics));
 
+// ── 首页随机展示 ────────────────────────────────────────────────────
+// 有中文名、有图的物种，打乱后每 200 个一个文件；首页每次随机取一个文件，从里面挑。
+// 一行：[id, 中文名, 学名, 科, 等级, 缩略图, 署名]
+const order = (id) => createHash('sha1').update(id).digest('hex');
+const showable = briefs.filter((b) => b.zh && b.img?.thumb).sort((a, b) => order(a.id).localeCompare(order(b.id)));
+const featured = [];
+for (let i = 0; i < showable.length; i += 200) {
+  featured.push(showable.slice(i, i + 200).map((b) => [b.id, b.zh, b.sci, fam(b), LEVEL_CODES.indexOf(b.safety), b.img.thumb, `${b.img.author} · ${b.img.license}`]));
+}
+await mkdir(path.join(PUB, 'featured'), { recursive: true });
+await Promise.all(featured.map((rows, i) => writeFile(path.join(PUB, 'featured', `${i}.json`), JSON.stringify(rows))));
+
 // ── 统计、来源 ──────────────────────────────────────────────────────
 const count = (f) => briefs.filter(f).length;
 const stats = {
@@ -225,7 +239,8 @@ const stats = {
   families: taxonomy.length,
   genera: taxonomy.reduce((n, f) => n + f.genera.length, 0),
   uses: uses.length,
-  images: count((b) => b.hasImg),
+  images: count((b) => b.img),
+  featured: featured.length,
   bySafety: Object.fromEntries(LEVEL_CODES.map((l) => [l, count((b) => b.safety === l)])),
   topics: topics.map((t) => ({ slug: t.slug, title: t.title, kind: t.kind, lead: t.lead, n: t.items.length })),
 };
@@ -235,5 +250,5 @@ await writeFile(path.join(GEN, 'sources.json'), JSON.stringify(sources));
 const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(
   `数据：${briefs.length} 个物种（共 ${mb(docBytes)}，最大 ${(docMax / 1e3).toFixed(0)} KB），` +
-    `搜索索引 ${mb(searchBody.length)}，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
+    `搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
 );

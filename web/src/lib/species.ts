@@ -13,7 +13,7 @@ export interface Species {
   uses?: { c: string; texts?: string[]; refs?: number[] }[]; refs?: string[];
   flags?: { f: string; src: string[]; ref?: string }[];
   traits?: [string, string][];
-  img?: { file: string; author: string; license: string; licenseUrl?: string };
+  img?: { url: string; thumb: string; page: string; author: string; license: string; licenseUrl?: string; src: string };
 }
 
 /** 物种数据在 D1 里，一个物种一行 JSON。数据库出错时抛出，由页面返回 503。 */

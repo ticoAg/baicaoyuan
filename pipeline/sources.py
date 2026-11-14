@@ -115,6 +115,14 @@ SOURCES: list[Source] = [
         url="https://commons.wikimedia.org/",
         version="抓取当日",
     ),
+    Source(
+        id="inat",
+        title="iNaturalist",
+        license="逐张照片授权（只取 CC0 / 公有领域 / CC BY / CC BY-SA）",
+        url="https://www.inaturalist.org/",
+        version="抓取当日",
+        files={"inat_taxa.csv.gz": "https://inaturalist-open-data.s3.amazonaws.com/taxa.csv.gz"},
+    ),
 ]
 
 BY_ID = {s.id: s for s in SOURCES}

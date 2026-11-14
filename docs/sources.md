@@ -103,7 +103,7 @@ WCFP 的"食用"标记只表示**有文献记载过食用**，不表示安全。
 | 中文维基百科 | <https://dumps.wikimedia.org/zhwiki/> | CC BY-SA 4.0 | 带 POWO ID 的植物条目中 42,400 个有中文维基页面；带 Index Fungorum ID 的真菌条目中 3,842 个有。只算"种"一级：植物 34,934 篇，真菌 1,453 篇。深浅不一：马齿苋、鱼腥草、香椿有形态、分布、用途、毒性各节；蕨、藜只有几行；致命鹅膏没有条目 | 形态、用途、栽培的正文 |
 | 國家公園物種知識庫（台湾内政部，data.gov.tw 8658） | <https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/0BAA364D-53A4-4D05-8B3C-874C6731F489/resource/6DD94EA4-9837-4382-8992-710D81E818E0/download> | 政府資料開放授權條款－第 1 版 | 5,383 行，其中植物 2,965 种（无真菌）。2,907 种有成段的**形态特征**，2,964 种有生态习性，另有分布、俗名 | 可直接使用的中文形态描述 |
 | Wikimedia Commons | <https://commons.wikimedia.org/> | 每个文件单独授权：CC0、公有领域、CC BY、CC BY-SA | 91,658 个植物条目在 Wikidata 上有图（`P18`）；接口返回作者与许可，短时间内请求过多会被限流 | 图片主力。只存文件名，页面直接引用 Commons |
-| iNaturalist Open Data | <https://github.com/inaturalist/inaturalist-open-data> | 每张照片单独授权，多数为 CC BY-NC | 未实测 | 只取 CC0、CC BY、CC BY-SA 的照片 |
+| iNaturalist | <https://www.inaturalist.org/>；物种表 <https://inaturalist-open-data.s3.amazonaws.com/taxa.csv.gz>；接口 `api.inaturalist.org/v1/taxa/{id}` | 每张照片单独授权，多数为 CC BY-NC | 物种表 167 万行，按学名经 WCVP 异名归并后对上 29,392 种。接口一次查 30 个物种，返回每个物种的代表照片（最多 12 张）及作者、许可；建议每分钟不超过 60 次请求 | 给没有 Commons 配图的物种补图。只取 CC0、公有领域、CC BY、CC BY-SA 的照片，只存编号，页面直接引用 iNaturalist 的图片地址 |
 | Mushroom Observer | <https://mushroomobserver.org/> | 每张图片单独授权，默认 CC BY-SA | 从本环境连接被重置，未能实测 | 真菌图片与观察记录 |
 | 台灣食品營養成分資料集（台湾食药署，data.gov.tw 8543） | <https://data.fda.gov.tw/data/opendata/export/20/csv> | 政府資料開放授權條款－第 1 版 | 230,152 行，2,213 种食物：蔬菜 309、水果 242、菇类 57、谷物 89、豆类 44、坚果种子 40、藻类 22。列：分类、样品名、俗名、英文名、分析项、每 100 克含量 | 中文的营养成分表，带俗名 |
 | USDA FoodData Central | <https://fdc.nal.usda.gov/download-datasets> | CC0 | 未实测 | 营养成分 |

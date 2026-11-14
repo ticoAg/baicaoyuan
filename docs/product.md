@@ -188,7 +188,7 @@
 | 检索 | 浏览器内索引（自建，一个静态文件） | 不需要服务器，离线可用；支持别名、拼音、学名 |
 | 图谱 | Cytoscape.js，按物种取子图 | 全图太大，只在物种页显示一跳、两跳 |
 | 数据管线 | Python + DuckDB → Parquet | 与 baicao-knowledge 的结构一致 |
-| 图片 | 只存链接，直接引用源站（Wikimedia Commons 等），页面上标作者与许可 | 见下 |
+| 图片 | 只存链接，直接引用源站（Wikimedia Commons、iNaturalist），页面上标作者与许可 | 见下 |
 
 物种页不预渲染的原因：Cloudflare 免费额度每个 Worker 最多 2 万个静态文件，物种有 3.8 万个。静态文件请求不限量；Worker 每天 10 万次请求，只有物种页用到。
 

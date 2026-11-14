@@ -185,14 +185,46 @@ table.parts td:nth-child(5) { min-width: 9rem; }
 .species-list .only-sci { font-family: var(--latin); font-style: italic; }
 
 /* 首页 */
-.hero { padding: 3.5rem 0 2.5rem; border-bottom: 1px solid var(--rule); }
-.hero h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); letter-spacing: 0.04em; }
+.hero { padding: 3rem 0 2.75rem; border-bottom: 1px solid var(--rule); }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 27rem); gap: 3.5rem; align-items: center; }
+.hero h1 { font-size: clamp(2.2rem, 4.3vw, 3.3rem); letter-spacing: 0.04em; }
 .hero h1 em { font-style: normal; color: var(--accent); }
-.hero .lead { margin-top: 0.9rem; font-size: 1.15rem; }
+.hero h1 span { white-space: nowrap; }
+.hero .lead { margin-top: 0.9rem; font-size: 1.12rem; }
 .hero .search { max-width: 40rem; margin: 1.8rem 0 0.8rem; }
 .hero .search input { height: 3.3rem; font-size: 1.1rem; padding-left: 1.3rem; }
-.hero .tries { font-size: 0.9rem; color: var(--ink-3); }
+.hero .tries { font-size: 0.9rem; color: var(--ink-3); margin: 0; }
 .hero .tries a { margin-right: 0.9rem; }
+
+/* 随机物种卡片 */
+.picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem 1.25rem; }
+.pick { display: block; color: var(--ink); text-decoration: none; min-width: 0; }
+.pick-img { position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--radius); background: var(--muted-wash); }
+.pick-img img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.35s, scale 0.5s; }
+.pick-img img.ready { opacity: 1; }
+.pick:hover .pick-img img { scale: 1.04; }
+.pick-lv { position: absolute; left: 0.5rem; top: 0.5rem; font-size: 0.76rem; line-height: 1.6; padding: 0 0.5rem 0 0.42rem; border-radius: 999px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: 0 1px 4px rgb(0 0 0 / 0.18); }
+.pick-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 0.6rem; align-items: baseline; margin-top: 0.55rem; }
+.pick-body b { font-family: var(--serif); font-size: 1.12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick:hover .pick-body b { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+.pick-body .sci { grid-column: 1; font-size: 0.85rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-fam { grid-column: 2; grid-row: 1; font-size: 0.8rem; color: var(--ink-3); white-space: nowrap; }
+.pick-credit { display: block; margin-top: 0.15rem; font-size: 0.7rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick[aria-hidden] { pointer-events: none; }
+.pick.big .pick-img { border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.12); }
+.pick.big .pick-lv { font-size: 0.86rem; left: 0.75rem; top: 0.75rem; }
+.pick.big .pick-body { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 2.4rem 1rem 0.8rem; color: #fff; background: linear-gradient(transparent, rgb(0 0 0 / 0.72)); border-radius: 0 0 10px 10px; pointer-events: none; }
+.pick.big { position: relative; }
+.pick.big .pick-body b { font-size: 1.55rem; }
+.pick.big .pick-body .sci, .pick.big .pick-fam { color: rgb(255 255 255 / 0.85); font-size: 0.92rem; }
+.pick.big .pick-credit { position: absolute; right: 0; top: 100%; margin-top: 0.35rem; max-width: 100%; }
+.discover > h2 .again { margin-left: auto; font: 500 0.86rem var(--sans); color: var(--accent-ink); background: none; border: 1px solid var(--rule); border-radius: 999px; padding: 0.2rem 0.9rem; cursor: pointer; }
+.discover > h2 .again:hover { border-color: var(--accent); background: var(--accent-wash); }
+.discover > h2 .again:disabled { opacity: 0.5; cursor: default; }
+.no-picks .discover, .no-picks .hero .pick { display: none; }
+.no-picks .hero-grid { grid-template-columns: minmax(0, 1fr); }
+@media (prefers-reduced-motion: reduce) { .pick-img img { transition: none; } .pick:hover .pick-img img { scale: none; } }
+.grid.topics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
 .card { display: block; padding: 1.1rem 1.2rem; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); text-decoration: none; color: var(--ink); border-top: 3px solid var(--tone, var(--rule)); }
 .card:hover { border-color: var(--tone, var(--accent)); box-shadow: 0 4px 16px rgb(0 0 0 / 0.06); }
@@ -276,6 +308,9 @@ details.refs li { margin-bottom: 0.25rem; overflow-wrap: anywhere; }
 .prose li { margin-bottom: 0.3rem; }
 
 @media (max-width: 900px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.topics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sp-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
   .sp-aside { position: static; }
   .site-nav { display: none; }
@@ -284,6 +319,11 @@ details.refs li { margin-bottom: 0.25rem; overflow-wrap: anywhere; }
 }
 @media (max-width: 600px) {
   .wrap { width: min(100% - 1.75rem, var(--w)); }
+  .hero { padding: 2rem 0; }
+  .picks { gap: 1.1rem 0.8rem; }
+  .pick-fam { display: none; }
+  .grid.topics { grid-template-columns: minmax(0, 1fr); }
+  .discover > h2 .count { display: none; }
   .sp-head { grid-template-columns: 1fr; gap: 0.3rem; }
   .sp-head .family { text-align: left; padding-top: 0; }
   .sp-head h1 { font-size: 2.1rem; }
