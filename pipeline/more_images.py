@@ -101,12 +101,31 @@ def commons_license(meta: dict) -> dict | None:
         name, url = "公有领域", None
     else:
         return None
-    author = re.sub(r"^User:", "", v("Artist"))
-    if author.lower() in ("", "unknown", "unknown author", "anonymous"):
+    author = clean_author(v("Artist"))
+    if not author:
         if name != "公有领域" and not name.startswith("CC0"):
             return None
         author = "佚名"
-    return {"author": author[:80], "license": name, "license_url": url or None}
+    return {"author": author, "license": name, "license_url": url or None}
+
+
+def clean_author(s: str) -> str:
+    """Commons 的 Artist 字段是自由填写的 HTML：去掉常见的套话、链接，太长的在逗号处截断。查不到作者返回空串。"""
+    s = re.sub(r"https?://\S+", "", s)
+    if m := re.search(r"No machine-readable author provided\. (.+?) assumed", s):
+        s = m.group(1)
+    elif m := re.search(r"created by user (.+?) at Mushroom Observer", s):
+        s = f"{m.group(1)}, Mushroom Observer"
+    elif m := re.search(r"Original uploader was (.+?) at ", s):
+        s = m.group(1)
+    s = re.sub(r"^User:", "", s).strip(" .,;:-")
+    s = re.sub(r"\s+", " ", s)
+    if re.fullmatch(r"(?i)(anonymous|unknown|unknown author|anonymous unknown author|author unknown|see below)?", s):
+        return ""
+    if len(s) > 80:
+        cut = s[:80].rsplit(",", 1)[0] if "," in s[:80] else s[:80].rsplit(" ", 1)[0]
+        s = f"{cut.strip()} 等"
+    return s
 
 
 def commons(files: list[str]) -> dict[str, dict | None]:
