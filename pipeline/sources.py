@@ -118,6 +118,7 @@ SOURCES: list[Source] = [
         title="iNaturalist",
         license="逐张照片授权（CC0 / 公有领域 / CC BY / CC BY-SA）",
         url="https://www.inaturalist.org/",
+        # 物种照片走 iNaturalist 接口（inat.py）；观察记录照片经 GBIF 检索（more_images.py）
         files={"inat_taxa.csv.gz": "https://inaturalist-open-data.s3.amazonaws.com/taxa.csv.gz"},
     ),
 ]

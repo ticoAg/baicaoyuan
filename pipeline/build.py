@@ -33,6 +33,7 @@ import duckdb
 import openpyxl
 from opencc import OpenCC
 
+import more_images
 import vocab
 from sources import SOURCES
 
@@ -762,6 +763,12 @@ class Build:
             n += 1
         print(f"iNaturalist：对上 {len(cand)} 种，补了 {n} 张图；共 {len(self.images)} 种有图")
 
+    def more_images(self) -> None:
+        """还没有图的物种，用 more_images.py 查到的图补：Commons 接口查到作者的配图、iNaturalist 观察记录照片。"""
+        extra = more_images.rows({i["taxon_id"] for i in self.images})
+        self.images += extra
+        print(f"补图：{len(extra)} 张；共 {len({i['taxon_id'] for i in self.images})} 种有图")
+
     # ── 安全等级 ─────────────────────────────────────────────────────
     def grade(self) -> None:
         level: dict[str, str] = collections.defaultdict(lambda: "unknown")
@@ -809,6 +816,7 @@ class Build:
         self.rank_names(primary)
         self.license_images()
         self.inat_images()
+        self.more_images()
         self.grade()
         for tid, t in self.taxa.items():
             t["zh"] = primary.get(tid)

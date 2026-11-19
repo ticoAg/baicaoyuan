@@ -10,6 +10,7 @@ uv run python build.py     # 合并，输出 data/snapshot/
 uv run python images.py    # 给 Commons 的配图查作者与许可（端点限流，全量约一小时；可跳过）
 uv run python inat.py      # 取 iNaturalist 上开放许可的物种照片（全量约半小时；可跳过）
 uv run python build.py     # 带上图片再合并一次
+uv run python more_images.py  # 还没有图的物种补图，直接写进快照（全量约一小时；可跳过）
 ```
 
 | 文件 | 作用 |
@@ -18,6 +19,7 @@ uv run python build.py     # 带上图片再合并一次
 | `fetch.py` | 下载文件；跑 Wikidata 的 SPARQL 查询（QLever 镜像，失败时换官方端点） |
 | `images.py` | 从 Wikimedia Commons 的结构化数据取图片的作者与许可 |
 | `inat.py` | 从 iNaturalist 的接口取物种照片的编号、作者与许可 |
+| `more_images.py` | 还没有图的物种补图：Commons 接口查作者的 Wikidata 配图，经 GBIF 检索的 iNaturalist 观察记录照片 |
 | `vocab.py` | 受控词表：生活型、毒性分级、部位、蘑菇形态等取值的中文 |
 | `build.py` | 学名对齐、中文名清洗、用途、毒性、安全等级，写出 Parquet |
 
@@ -43,5 +45,5 @@ uv run python build.py     # 带上图片再合并一次
 - **物种范围**：WCVP 记录在中国（含台湾）有分布的接受种，加上中文来源提到的其他物种（多为栽培作物）。真菌只收 Wikidata 上有可食性声明、且有中文名的。
 - **学名对齐**：别的来源里的学名先化成二名法，再经 WCVP 的异名表归并到接受种；种下等级并入种。
 - **中文名**：正名的优先级是 Wikidata 简体标签 → 中文维基标题 → TaiCOL → 中国有用植物数据集。别名如果和另一个物种的正名相同，去掉（多半是错配）。
-- **图片**：只记链接，图片留在源站。一个物种一张：先用 Wikidata 上的配图（Wikimedia Commons），没有的用 iNaturalist 的物种照片补。只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的。
+- **图片**：只记链接，图片留在源站。一个物种一张：先用 Wikidata 上的配图（Wikimedia Commons），没有的用 iNaturalist 的物种照片补，还没有的再用 `more_images.py` 补：Commons 结构化数据里查不到作者的配图改用 Commons 接口查，再不行取 iNaturalist 观察记录里的照片（经 GBIF 检索）。只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的。
 - **安全等级**：取最严。管线只会给出 `deadly`、`toxic`、`suspect`（中文名或别名里带「毒」「断肠」等字样）、`restricted`、`food_record`、`unknown`；`edible`、`processed`、`limited` 留给人工审核过的常见食物（`data/reviewed/foods.csv`，网站构建时并入）。合并规则见 [docs/product.md](../docs/product.md#安全表达)。
