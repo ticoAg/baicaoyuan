@@ -6,14 +6,14 @@
 
 1. Wikidata 的配图（P18）。build.py 靠 Commons 的结构化数据查作者，很多老图没有这项，整张被丢掉
    （番茄就是这样）。这里改用 Commons 接口的 extmetadata 取作者与许可。
-2. iNaturalist 观察记录里的照片，经 GBIF 检索。inat.py 只取物种页上的几张代表照片，
+2. iNaturalist 观察记录里的照片，取得票最多的研究级记录。inat.py 只取物种页上的几张代表照片，
    它们常是 NC 许可；观察记录里另有大量 CC0、CC BY、CC BY-SA 的照片。
-   先用 GBIF 的分面列出有这类照片的全部种名，只逐个查名单上的物种（名单按记录原文的学名，
-   异名会漏掉一小部分）。
+   逐个物种问 iNaturalist 要两万多次请求（每分钟限 60 次），所以先用 GBIF 的分面一次列出
+   带这类照片的全部种名，只问名单上的。名单按记录原文的学名，异名会漏掉一小部分。
 
 查询结果缓存在 data/raw/more_images.json（查过没有的也记下，下次不再问），
 然后直接补进 data/snapshot/images.parquet，不必重跑整条管线。build.py 也读这份缓存，重新构建时不会丢。
-只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的（公有领域的可以没有作者）。全量约半小时。
+只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的（公有领域的可以没有作者）。全量约四十分钟。
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ import json
 import re
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -42,7 +41,9 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 GBIF = "https://api.gbif.org/v1/occurrence/search"
 INAT_DATASET = "50c9509d-22c7-4a22-a47d-8c48425ef4a7"  # iNaturalist research-grade observations
 KINGDOM = {"plant": 6, "fungus": 5}  # GBIF 骨干分类的界
-INAT_PHOTO = re.compile(r"^https://inaturalist-open-data\.s3\.amazonaws\.com/photos/(\d+)/original\.(\w+)$")
+INAT_OBS = "https://api.inaturalist.org/v1/observations"
+INAT_SQUARE = re.compile(r"^https://inaturalist-open-data\.s3\.amazonaws\.com/photos/(\d+)/square\.(\w+)$")
+ICONIC = {"plant": "Plantae", "fungus": "Fungi"}
 COLUMNS = ["taxon_id", "url", "thumb", "page", "file", "author", "license", "license_url", "source"]
 
 
@@ -130,14 +131,13 @@ def commons(files: list[str]) -> dict[str, dict | None]:
     return out
 
 
-# ── 2. iNaturalist 观察记录（经 GBIF）────────────────────────────────
-INAT_CODE = [("publicdomain/zero", "cc0"), ("licenses/by-sa/", "cc-by-sa"), ("licenses/by/", "cc-by")]
+# ── 2. iNaturalist 观察记录 ─────────────────────────────────────────
 INAT_QUERY = {"datasetKey": INAT_DATASET, "mediaType": "StillImage", "license": ["CC0_1_0", "CC_BY_4_0"]}
 
 
 def photographed(kingdom: str) -> set[str]:
-    """有开放许可照片的 iNaturalist 记录里出现过的种名（二名，小写）。
-    按物种逐个查要两万多次请求，GBIF 会限流；先用分面一次列出所有种名，只查名单上的。"""
+    """GBIF 收录的 iNaturalist 记录里，带 CC0 或 CC BY 照片的种名（二名，小写）。
+    逐个物种去 iNaturalist 问要两万多次请求；先用 GBIF 的分面一次列出所有种名，只问名单上的。"""
     names, off = set(), 0
     while True:
         r = call("GET", GBIF, params={**INAT_QUERY, "kingdomKey": KINGDOM[kingdom], "limit": 0,
@@ -151,30 +151,39 @@ def photographed(kingdom: str) -> set[str]:
         time.sleep(2)
 
 
-def gbif_photo(sci: str, kingdom: str) -> dict | None:
-    r = call("GET", GBIF, params={**INAT_QUERY, "scientificName": sci, "kingdomKey": KINGDOM[kingdom], "limit": 20})
-    for rec in r.json().get("results", []):
-        # GBIF 按骨干分类匹配学名，异名可能带出别的物种：只收鉴定到这个种（或其种下）的记录
-        if rec.get("species") != sci and not (rec.get("verbatimScientificName") or "").startswith(sci):
+def obs_photo(sci: str, kingdom: str) -> dict | None:
+    """这个种得票最多的研究级观察记录里，第一张开放许可的照片。"""
+    r = call("GET", INAT_OBS, params={
+        "taxon_name": sci, "iconic_taxa": ICONIC[kingdom], "quality_grade": "research",
+        "photo_license": "cc0,cc-by,cc-by-sa", "order_by": "votes", "per_page": 10,
+    })
+    time.sleep(1.1)  # 接口建议每分钟不超过 60 次
+    for o in r.json().get("results", []):
+        name = (o.get("taxon") or {}).get("name") or ""
+        if name != sci and not name.startswith(sci + " "):  # 学名对不上的（异名归并、鉴定到别的种）不收
             continue
-        for m in rec.get("media", []):
-            hit = INAT_PHOTO.match(m.get("identifier") or "")
-            code = next((c for k, c in INAT_CODE if k in (m.get("license") or "")), None)
-            author = (m.get("creator") or m.get("rightsHolder") or "").strip()
-            if hit and code and (author or code == "cc0"):
+        user = o.get("user") or {}
+        author = (user.get("name") or user.get("login") or "").strip()
+        for p in o.get("photos", []):
+            hit = INAT_SQUARE.match(p.get("url") or "")
+            code = p.get("license_code")
+            if hit and code in vocab.INAT_LICENSE and not p.get("flags") and (author or code == "cc0"):
                 return {"id": int(hit.group(1)), "ext": hit.group(2), "license": code, "author": author or "佚名"}
     return None
 
 
 # ── 缓存 → 图片行 ────────────────────────────────────────────────────
 def load() -> dict:
-    return json.loads(CACHE.read_text()) if CACHE.exists() else {"commons": {}, "gbif": {}}
+    cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    cache.setdefault("commons", {})
+    cache.setdefault("obs", cache.pop("gbif", {}))  # 早先经 GBIF 逐个查的结果，格式相同
+    return cache
 
 
 def rows(have: set[str]) -> list[dict]:
     """缓存里查到的图，给 have 以外的物种，一种一张。build.py 也调用这里。"""
     cache, out = load(), []
-    for tid in sorted(set(cache["commons"]) | set(cache["gbif"])):
+    for tid in sorted(set(cache["commons"]) | set(cache["obs"])):
         if tid in have:
             continue
         if c := cache["commons"].get(tid):
@@ -185,7 +194,7 @@ def rows(have: set[str]) -> list[dict]:
                 "thumb": f"https://commons.wikimedia.org/wiki/Special:FilePath/{f}?width=500",
                 "page": f"https://commons.wikimedia.org/wiki/File:{f}",
             })
-        elif g := cache["gbif"].get(tid):
+        elif g := cache["obs"].get(tid):
             name, url = vocab.INAT_LICENSE[g["license"]]
             base = f"https://inaturalist-open-data.s3.amazonaws.com/photos/{g['id']}"
             out.append({
@@ -220,21 +229,16 @@ def main() -> None:
 
     # 2. iNaturalist 观察记录
     names = {k: photographed(k) for k in KINGDOM}
-    ask = [t for t in todo if t[0] not in found and t[0] not in cache["gbif"] and t[1].lower() in names[t[2]]]
-    print(f"GBIF：有开放许可照片的种名 {sum(map(len, names.values()))} 个，待查 {len(ask)} 种")
-    def look(t: tuple) -> dict | None | bool:
+    ask = [t for t in todo if t[0] not in found and t[0] not in cache["obs"] and t[1].lower() in names[t[2]]]
+    print(f"iNaturalist：GBIF 列出有开放许可照片的种名 {sum(map(len, names.values()))} 个，待查 {len(ask)} 种")
+    for n, t in enumerate(ask, 1):
         try:
-            return gbif_photo(t[1], t[2])
+            cache["obs"][t[0]] = obs_photo(t[1], t[2])
         except RuntimeError:
-            return False  # 接口一直不通：不记缓存，下次再查
-
-    with ThreadPoolExecutor(2) as pool:
-        for n, (t, photo) in enumerate(zip(ask, pool.map(look, ask)), 1):
-            if photo is not False:
-                cache["gbif"][t[0]] = photo
-            if n % 200 == 0 or n == len(ask):
-                save()
-                print(f"  {n}/{len(ask)}，其中有图 {sum(1 for x in ask[:n] if cache['gbif'].get(x[0]))}", flush=True)
+            pass  # 接口一直不通：不记缓存，下次再查
+        if n % 200 == 0 or n == len(ask):
+            save()
+            print(f"  {n}/{len(ask)}，其中有图 {sum(1 for x in ask[:n] if cache['obs'].get(x[0]))}", flush=True)
     save()
 
     # 补进快照
