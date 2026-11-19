@@ -52,7 +52,9 @@ def call(method: str, url: str, **kw) -> requests.Response:
             r = requests.request(method, url, headers=headers, timeout=180, **kw)
             if r.status_code == 429 or r.status_code >= 500:
                 wait = r.headers.get("Retry-After", "")
-                time.sleep(min(int(wait) if wait.isdigit() else 15 * (attempt + 1), 180))
+                wait = min(int(wait) if wait.isdigit() else 15 * (attempt + 1), 180)
+                print(f"  {r.status_code}，{wait} 秒后重试", flush=True)
+                time.sleep(wait)
                 continue
             r.raise_for_status()
             return r
@@ -203,9 +205,16 @@ def main() -> None:
     # 2. iNaturalist 观察记录
     ask = [t for t in todo if t[0] not in found and t[0] not in cache["gbif"]]
     print(f"GBIF：待查 {len(ask)} 种")
-    with ThreadPoolExecutor(8) as pool:
-        for n, (t, photo) in enumerate(zip(ask, pool.map(lambda t: gbif_photo(t[1], t[2]), ask)), 1):
-            cache["gbif"][t[0]] = photo
+    def look(t: tuple) -> dict | None | bool:
+        try:
+            return gbif_photo(t[1], t[2])
+        except RuntimeError:
+            return False  # 接口一直不通：不记缓存，下次再查
+
+    with ThreadPoolExecutor(4) as pool:
+        for n, (t, photo) in enumerate(zip(ask, pool.map(look, ask)), 1):
+            if photo is not False:
+                cache["gbif"][t[0]] = photo
             if n % 500 == 0 or n == len(ask):
                 save()
                 print(f"  {n}/{len(ask)}，其中有图 {sum(1 for x in ask[:n] if cache['gbif'].get(x[0]))}", flush=True)
