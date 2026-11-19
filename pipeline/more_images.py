@@ -8,10 +8,12 @@
    （番茄就是这样）。这里改用 Commons 接口的 extmetadata 取作者与许可。
 2. iNaturalist 观察记录里的照片，经 GBIF 检索。inat.py 只取物种页上的几张代表照片，
    它们常是 NC 许可；观察记录里另有大量 CC0、CC BY、CC BY-SA 的照片。
+   先用 GBIF 的分面列出有这类照片的全部种名，只逐个查名单上的物种（名单按记录原文的学名，
+   异名会漏掉一小部分）。
 
 查询结果缓存在 data/raw/more_images.json（查过没有的也记下，下次不再问），
 然后直接补进 data/snapshot/images.parquet，不必重跑整条管线。build.py 也读这份缓存，重新构建时不会丢。
-只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的（公有领域的可以没有作者）。全量约一小时。
+只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的（公有领域的可以没有作者）。全量约半小时。
 """
 
 from __future__ import annotations
@@ -52,7 +54,7 @@ def call(method: str, url: str, **kw) -> requests.Response:
             r = requests.request(method, url, headers=headers, timeout=180, **kw)
             if r.status_code == 429 or r.status_code >= 500:
                 wait = r.headers.get("Retry-After", "")
-                wait = min(int(wait) if wait.isdigit() else 15 * (attempt + 1), 180)
+                wait = min(max(int(wait) if wait.isdigit() else 0, 15 * (attempt + 1)), 180)
                 print(f"  {r.status_code}，{wait} 秒后重试", flush=True)
                 time.sleep(wait)
                 continue
@@ -130,13 +132,27 @@ def commons(files: list[str]) -> dict[str, dict | None]:
 
 # ── 2. iNaturalist 观察记录（经 GBIF）────────────────────────────────
 INAT_CODE = [("publicdomain/zero", "cc0"), ("licenses/by-sa/", "cc-by-sa"), ("licenses/by/", "cc-by")]
+INAT_QUERY = {"datasetKey": INAT_DATASET, "mediaType": "StillImage", "license": ["CC0_1_0", "CC_BY_4_0"]}
+
+
+def photographed(kingdom: str) -> set[str]:
+    """有开放许可照片的 iNaturalist 记录里出现过的种名（二名，小写）。
+    按物种逐个查要两万多次请求，GBIF 会限流；先用分面一次列出所有种名，只查名单上的。"""
+    names, off = set(), 0
+    while True:
+        r = call("GET", GBIF, params={**INAT_QUERY, "kingdomKey": KINGDOM[kingdom], "limit": 0,
+                                      "facet": "VERBATIM_SCIENTIFIC_NAME", "facetLimit": 50000, "facetOffset": off})
+        facets = r.json().get("facets") or [{"counts": []}]
+        counts = facets[0]["counts"]
+        names |= {" ".join(c["name"].split()[:2]) for c in counts}
+        if len(counts) < 50000:
+            return names
+        off += 50000
+        time.sleep(2)
 
 
 def gbif_photo(sci: str, kingdom: str) -> dict | None:
-    r = call("GET", GBIF, params={
-        "scientificName": sci, "kingdomKey": KINGDOM[kingdom], "datasetKey": INAT_DATASET,
-        "mediaType": "StillImage", "license": ["CC0_1_0", "CC_BY_4_0"], "limit": 20,
-    })
+    r = call("GET", GBIF, params={**INAT_QUERY, "scientificName": sci, "kingdomKey": KINGDOM[kingdom], "limit": 20})
     for rec in r.json().get("results", []):
         # GBIF 按骨干分类匹配学名，异名可能带出别的物种：只收鉴定到这个种（或其种下）的记录
         if rec.get("species") != sci and not (rec.get("verbatimScientificName") or "").startswith(sci):
@@ -203,19 +219,20 @@ def main() -> None:
     print(f"Commons：查了 {len(ask)} 种，累计补到 {len(found - have)} 种")
 
     # 2. iNaturalist 观察记录
-    ask = [t for t in todo if t[0] not in found and t[0] not in cache["gbif"]]
-    print(f"GBIF：待查 {len(ask)} 种")
+    names = {k: photographed(k) for k in KINGDOM}
+    ask = [t for t in todo if t[0] not in found and t[0] not in cache["gbif"] and t[1].lower() in names[t[2]]]
+    print(f"GBIF：有开放许可照片的种名 {sum(map(len, names.values()))} 个，待查 {len(ask)} 种")
     def look(t: tuple) -> dict | None | bool:
         try:
             return gbif_photo(t[1], t[2])
         except RuntimeError:
             return False  # 接口一直不通：不记缓存，下次再查
 
-    with ThreadPoolExecutor(4) as pool:
+    with ThreadPoolExecutor(2) as pool:
         for n, (t, photo) in enumerate(zip(ask, pool.map(look, ask)), 1):
             if photo is not False:
                 cache["gbif"][t[0]] = photo
-            if n % 500 == 0 or n == len(ask):
+            if n % 200 == 0 or n == len(ask):
                 save()
                 print(f"  {n}/{len(ask)}，其中有图 {sum(1 for x in ask[:n] if cache['gbif'].get(x[0]))}", flush=True)
     save()
