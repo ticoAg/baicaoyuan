@@ -203,7 +203,7 @@ def main() -> None:
     # 2. iNaturalist 观察记录
     ask = [t for t in todo if t[0] not in found and t[0] not in cache["gbif"]]
     print(f"GBIF：待查 {len(ask)} 种")
-    with ThreadPoolExecutor(4) as pool:
+    with ThreadPoolExecutor(8) as pool:
         for n, (t, photo) in enumerate(zip(ask, pool.map(lambda t: gbif_photo(t[1], t[2]), ask)), 1):
             cache["gbif"][t[0]] = photo
             if n % 500 == 0 or n == len(ask):
