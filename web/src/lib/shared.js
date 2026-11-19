@@ -7,7 +7,7 @@ export function slugOf(sci) {
 
 /**
  * 安全等级。rank 越大越严；glyph 用形状区分，不只靠颜色。
- * edible / processed / limited 只由人工审核过的词条给出。
+ * edible / processed / limited 只由人工审核过的常见食物给出（data/reviewed/foods.csv）。
  */
 export const LEVELS = {
   deadly: { rank: 8, glyph: '✕', label: '致命', tone: 'deadly', hint: '有致死记录' },
@@ -16,7 +16,7 @@ export const LEVELS = {
   restricted: { rank: 5, glyph: '⊘', label: '未确认安全', tone: 'warn', hint: '监管机构未确认其食用安全性' },
   limited: { rank: 4, glyph: '◑', label: '少量', tone: 'warn', hint: '过量有害，或对部分人群有害' },
   processed: { rank: 3, glyph: '◐', label: '处理后可食', tone: 'ok', hint: '必须经过指定处理' },
-  edible: { rank: 2, glyph: '●', label: '可食', tone: 'ok', hint: '有可靠的食用记录，且该部位无毒性记录' },
+  edible: { rank: 2, glyph: '●', label: '可食', tone: 'ok', hint: '平常吃的部位，经人工审核' },
   food_record: { rank: 1, glyph: '◌', label: '有食用记录', tone: 'muted', hint: '有文献记载食用，不能据此食用' },
   unknown: { rank: 0, glyph: '○', label: '未知', tone: 'muted', hint: '没有足够证据，不要吃' },
 };

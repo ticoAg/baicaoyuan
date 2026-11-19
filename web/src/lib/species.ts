@@ -13,6 +13,8 @@ export interface Species {
   uses?: { c: string; texts?: string[]; refs?: number[] }[]; refs?: string[];
   flags?: { f: string; src: string[]; ref?: string }[];
   traits?: [string, string][];
+  /** 人工审核过的食用部位（data/reviewed/foods.csv），第一条是平常吃的部位，safety 取它的等级。 */
+  eat?: { part: string; v: keyof typeof LEVELS; note?: string }[];
   /** 后台新建的词条，不来自数据管线。 */
   manual?: boolean;
   /** 数据里带的图。 */
@@ -99,6 +101,7 @@ export const SOURCE_SHORT: Record<string, string> = {
   xsbn: '西双版纳数据集',
   commons: 'Wikimedia Commons',
   inat: 'iNaturalist',
+  reviewed: '本站审核',
 };
 export const src = (id: string) => SOURCE_SHORT[id] ?? id;
 
@@ -106,9 +109,16 @@ export const REDLIST: Record<string, string> = {
   EX: '灭绝', EW: '野外灭绝', CR: '极危', EN: '濒危', VU: '易危', NT: '近危', LC: '无危', DD: '数据缺乏',
 };
 
-/** 物种页顶部的安全结论：取各条记录里最严的一档，再点明另有的记录。 */
+/**
+ * 物种页顶部的安全结论。
+ * 审核过的常见食物只说平常吃的部位；其余的取各条记录里最严的一档，再点明另有的记录。
+ */
 export function verdict(sp: Species) {
   const lv = LEVELS[sp.safety] ?? LEVELS.unknown;
+  if (sp.eat?.length) {
+    const lines = sp.eat.map((e) => `${e.v === sp.safety ? '' : `${LEVELS[e.v].label}：`}${e.part}${e.note ? ` · ${e.note}` : ''}`);
+    return { lv, lines, tail: '', reviewed: true };
+  }
   const hazards = (sp.hazards ?? []).filter((h) => h.lv);
   const foodSources = [...new Set([
     ...(sp.flags ?? []).filter((f) => f.f === '食用').flatMap((f) => f.src),

@@ -33,6 +33,9 @@ const hazards = sp.hazards ?? [];
 const uses = sp.uses ?? [];
 const refs = sp.refs ?? [];
 const flags = sp.flags ?? [];
+// 审核过的常见食物：部位表只列食用部位和毒性记录，不列用途记录
+const eat = sp.eat ?? [];
+const reviewed = eat.length > 0;
 const dist = new Map(sp.dist ?? []);
 const provinceStatus = new Map<string, string>();
 for (const [code, r] of Object.entries(REGIONS)) {
@@ -41,16 +44,26 @@ for (const [code, r] of Object.entries(REGIONS)) {
 }
 const regionNames = (st: string) => Object.entries(REGIONS).filter(([c]) => dist.get(c) === st).map(([, r]) => r.name);
 
-// 部位表：毒性记录和按部位的食用记录放在一张表里，最严的排前
-const rows = [
-  ...hazards.map((h) => ({ part: h.part, level: h.lv, label: h.label, use: h.toxins ? `含 ${h.toxins}` : '', note: h.note, src: h.src, ref: h.ref })),
-  ...parts.map((p) => ({ part: p.part, level: p.v, label: undefined as string | undefined, use: p.use ?? '', note: p.note, src: p.src, ref: p.ref })),
-];
+// 部位表：毒性记录和按部位的食用记录放在一张表里，最严的排前。
+// 审核过的常见食物先列食用部位，再列有等级的毒性记录。
+const rows = reviewed
+  ? [
+      // 食用部位的说明已经写在顶部结论里，表里不重复
+      ...eat.map((e) => ({ part: e.part, level: e.v as string | undefined, label: undefined as string | undefined, use: '', note: undefined as string | undefined, src: 'reviewed', ref: undefined as string | undefined })),
+      ...hazards.filter((h) => h.lv).map((h) => ({ part: h.part, level: h.lv, label: h.label, use: '', note: h.note, src: h.src, ref: h.ref })),
+    ]
+  : [
+      ...hazards.map((h) => ({ part: h.part, level: h.lv, label: h.label, use: h.toxins ? `含 ${h.toxins}` : '', note: h.note, src: h.src, ref: h.ref })),
+      ...parts.map((p) => ({ part: p.part, level: p.v as string | undefined, label: undefined as string | undefined, use: p.use ?? '', note: p.note, src: p.src, ref: p.ref })),
+    ];
+const showUse = rows.some((r) => r.use);
+const showNote = rows.some((r) => r.note);
+const showUses = !reviewed && (flags.length > 0 || uses.length > 0);
 const used = new Set<string>([
   ...(sp.dist?.length ? ['wcvp'] : sp.k === 'plant' && !sp.manual ? ['wcvp'] : []),
   ...rows.map((r) => r.src),
-  ...flags.flatMap((f) => f.src),
-  ...(uses.length ? ['cn_useful'] : []),
+  ...(showUses ? flags.flatMap((f) => f.src) : []),
+  ...(showUses && uses.length ? ['cn_useful'] : []),
   ...(sp.traits?.length ? ['wikidata'] : []),
   ...(sp.wd ? ['wikidata'] : []),
   ...imagesOf(sp).map((im) => im.src),
@@ -106,7 +119,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             {v.tail && <p class="small">{v.tail}</p>}
           </div>
         </section>
-        {fungus && <p class="fixed-warning">颜色、银针、虫咬都不能用来判断蘑菇有没有毒。</p>}
+        {fungus && <p class="fixed-warning">颜色、银针、虫咬都不能用来判断蘑菇有没有毒。{reviewed && '这里说的是市场上卖的栽培品，野外采到长得像的不要吃。'}</p>}
 
         {images.length > 0 && (
           <figure class="figure" data-gallery>
@@ -134,14 +147,14 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             <h2>各部位</h2>
             <div class="table-scroll">
               <table class="data parts">
-                <thead><tr><th>部位</th><th>结论</th><th>记录</th><th>备注</th><th>出处</th></tr></thead>
+                <thead><tr><th>部位</th><th>结论</th>{showUse && <th>记录</th>}{showNote && <th>备注</th>}<th>出处</th></tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr>
                       <td>{r.part ?? <span class="muted">未注明</span>}</td>
                       <td>{r.level ? <Level level={r.level} label={r.label} /> : <span class="muted">{r.label ?? '—'}</span>}</td>
-                      <td>{r.use || <span class="muted">—</span>}</td>
-                      <td class="small">{r.note ?? ''}</td>
+                      {showUse && <td>{r.use || <span class="muted">—</span>}</td>}
+                      {showNote && <td class="small">{r.note ?? ''}</td>}
                       <td class="small">{src(r.src)}{r.ref && <><br /><span class="muted">{r.ref}</span></>}</td>
                     </tr>
                   ))}
@@ -158,7 +171,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             <table class="data">
               <tbody>
                 {[...new Set(sp.traits.map((t) => t[0]))].map((name) => (
-                  <tr><th scope="row" style="width:8rem">{name}</th><td>{sp.traits!.filter((t) => t[0] === name).map((t) => t[1]).join('、')}</td></tr>
+                  <tr><th scope="row" style="width:8rem">{name}</th><td>{[...new Set(sp.traits!.filter((t) => t[0] === name).map((t) => t[1]))].join('、')}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -166,7 +179,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
           </section>
         ) : null}
 
-        {(flags.length > 0 || uses.length > 0) && (
+        {showUses && (
           <section class="section">
             <h2>用途记录</h2>
             {flags.length > 0 && (
@@ -231,7 +244,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             </ol>
           )}
           {sp.manual && <p>本站录入的词条。</p>}
-          <p class="note">以上内容尚未经人工审核。发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
+          <p class="note">{reviewed ? '食用部位的结论经本站审核，其余内容尚未经人工审核。' : '以上内容尚未经人工审核。'}发现错误，请<a href={issue} rel="noopener">提交纠错</a>。</p>
         </section>
       </article>
 
