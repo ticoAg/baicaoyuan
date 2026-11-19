@@ -5,6 +5,8 @@
 //   public/data/featured/*.json 首页随机展示用的物种，分成小文件，一次取一个
 //   src/generated/*.json        预渲染页面（分类、专题、关于）在构建时读取
 //
+// ../data/reviewed/foods.csv 是人工审核过的常见食物：有这份记录的物种，安全等级取平常吃的部位的结论。
+//
 // 后台维护的改动（D1 的 edits 表）在这里并进搜索、分类、专题和首页；species.ndjson 不并，
 // 物种页在运行时自己合并。读不到改动表时照常构建。
 //
@@ -12,7 +14,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +27,7 @@ const DATA = process.env.BCY_DATA_DIR ? path.resolve(process.env.BCY_DATA_DIR) :
 const PUB = path.join(WEB, 'public/data');
 const GEN = path.join(WEB, 'src/generated');
 const OUT = path.join(WEB, '.data');
+const REVIEWED = path.resolve(WEB, '../data/reviewed/foods.csv');
 
 if (!existsSync(path.join(DATA, 'taxa.parquet'))) {
   console.error(`找不到数据：${DATA}/taxa.parquet。先运行 pipeline（见 pipeline/README.md），或设置 BCY_DATA_DIR。`);
@@ -54,6 +57,55 @@ const G = {
   names: groupBy(names), dist: groupBy(dist), uses: groupBy(uses), flags: groupBy(flags),
   parts: groupBy(parts), hazards: groupBy(hazards), traits: groupBy(traits), images: groupBy(images),
 };
+
+// ── 人工审核过的常见食物 ────────────────────────────────────────────
+// 一行一个部位：id, zh（只是方便人看）, part, level, note。同一物种可以有多行，第一行是平常吃的部位。
+// 物种顶部的结论只看这里；其他部位的毒性记录照常列在物种页的部位表里。
+const parseCsv = (text) => {
+  const rows = [];
+  let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') cell += text[++i];
+      else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') row.push(cell), (cell = '');
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell), (cell = '');
+      if (row.some((c) => c.trim())) rows.push(row);
+      row = [];
+    } else cell += ch;
+  }
+  row.push(cell);
+  if (row.some((c) => c.trim())) rows.push(row);
+  return rows;
+};
+const EAT_LEVELS = ['edible', 'processed', 'limited'];
+const eats = new Map();
+if (existsSync(REVIEWED)) {
+  const [head, ...rows] = parseCsv(await readFile(REVIEWED, 'utf8'));
+  const col = Object.fromEntries(head.map((h, i) => [h.trim(), i]));
+  const byId = new Map(taxa.map((t) => [t.id, t]));
+  for (const [n, r] of rows.entries()) {
+    const [id, zh, part, level, note] = ['id', 'zh', 'part', 'level', 'note'].map((k) => (r[col[k]] ?? '').trim());
+    if (!EAT_LEVELS.includes(level) || !part) {
+      console.error(`${path.relative(WEB, REVIEWED)} 第 ${n + 2} 行：level 只能是 ${EAT_LEVELS.join('、')}，part 不能为空`);
+      process.exit(1);
+    }
+    const t = byId.get(id);
+    if (!t) {
+      console.warn(`${path.relative(WEB, REVIEWED)} 第 ${n + 2} 行：数据里没有 ${id}，跳过`);
+      continue;
+    }
+    if (zh && t.zh && zh !== t.zh) console.warn(`${path.relative(WEB, REVIEWED)} 第 ${n + 2} 行：${id} 在数据里叫「${t.zh}」，表里写的是「${zh}」`);
+    let list = eats.get(id);
+    if (!list) eats.set(id, (list = []));
+    list.push(compact({ part, v: level, note: note || undefined }));
+  }
+}
 
 // ── 后台的改动 ──────────────────────────────────────────────────────
 // 在 Workers Builds 里读线上库，其余时候读本地开发库。
@@ -111,11 +163,13 @@ for (const t of taxa) {
   }
   const img = (G.images.get(id) ?? []).filter((i) => i.url && i.author && i.license)[0];
 
+  const eat = eats.get(id);
+  const safety = eat ? eat[0].v : t.safety;
   const doc = compact({
     id, k: t.kingdom, sci: t.sci, au: t.authors, zh: t.zh, alias,
     fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, ord: t.order,
     lf: t.lifeform, cl: t.climate, cn: t.in_china, nat: t.native_cn, cult: t.cultivated, rl: t.redlist,
-    safety: t.safety, powo: t.powo_id, wd: t.wikidata, zhwiki: t.zhwiki,
+    safety, eat, powo: t.powo_id, wd: t.wikidata, zhwiki: t.zhwiki,
     dist: (G.dist.get(id) ?? []).map((d) => [d.area, d.status === 'native' ? 'n' : 'i']),
     parts: (G.parts.get(id) ?? []).map((p) => compact({ part: p.part, v: p.verdict, use: p.use, note: p.note, src: p.source, ref: p.reference })),
     hazards: (G.hazards.get(id) ?? []).map((h) => compact({ lv: h.level, part: h.part, label: h.label, note: h.note, toxins: h.toxins, src: h.source, ref: h.reference })),
@@ -126,7 +180,7 @@ for (const t of taxa) {
     img: img && compact({ url: img.url, thumb: img.thumb, page: img.page, author: img.author, license: img.license, licenseUrl: img.license_url, src: img.source }),
   });
   docs.push(JSON.stringify(doc));
-  const brief = { id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety: t.safety, cult: !!t.cultivated, img };
+  const brief = { id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety, cult: !!t.cultivated, img };
   briefs.push(patches.has(id) ? patched(brief, patches.get(id)) : brief);
 }
 // 后台新建的词条
@@ -276,6 +330,7 @@ const stats = {
   genera: taxonomy.reduce((n, f) => n + f.genera.length, 0),
   uses: uses.length,
   images: count((b) => b.img),
+  reviewed: eats.size,
   featured: featured.length,
   bySafety: Object.fromEntries(LEVEL_CODES.map((l) => [l, count((b) => b.safety === l)])),
   topics: topics.map((t) => ({ slug: t.slug, title: t.title, kind: t.kind, lead: t.lead, n: t.items.length })),
@@ -286,5 +341,5 @@ await writeFile(path.join(GEN, 'sources.json'), JSON.stringify(sources));
 const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(
   `数据：${briefs.length} 个物种（共 ${mb(docBytes)}，最大 ${(docMax / 1e3).toFixed(0)} KB），` +
-    `后台改动 ${edits.length} 条，搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
+    `审核过的常见食物 ${eats.size} 种，后台改动 ${edits.length} 条，搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
 );

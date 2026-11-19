@@ -56,7 +56,7 @@ const legend = ['edible', 'processed', 'limited', 'toxic', 'deadly', 'suspect', 
       <ul class="legend">
         {legend.map((k) => <li><Level level={k} /><span>{LEVELS[k as keyof typeof LEVELS].hint}</span></li>)}
       </ul>
-      <p class="note" style="margin-top:0.9rem">各来源说法不同时，按最严的一档显示。有食用记录不等于可食。<a href="/about/">结论怎么来的</a></p>
+      <p class="note" style="margin-top:0.9rem">常见食物只看平常吃的部位；其余的，各来源说法不同时按最严的一档显示。有食用记录不等于可食。<a href="/about/">结论怎么来的</a></p>
     </section>
 
     <section class="section">

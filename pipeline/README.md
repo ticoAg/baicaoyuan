@@ -44,4 +44,4 @@ uv run python build.py     # 带上图片再合并一次
 - **学名对齐**：别的来源里的学名先化成二名法，再经 WCVP 的异名表归并到接受种；种下等级并入种。
 - **中文名**：正名的优先级是 Wikidata 简体标签 → 中文维基标题 → TaiCOL → 中国有用植物数据集。别名如果和另一个物种的正名相同，去掉（多半是错配）。
 - **图片**：只记链接，图片留在源站。一个物种一张：先用 Wikidata 上的配图（Wikimedia Commons），没有的用 iNaturalist 的物种照片补。只收 CC0、公有领域、CC BY、CC BY-SA，且查得到作者的。
-- **安全等级**：取最严。管线只会给出 `deadly`、`toxic`、`suspect`（中文名或别名里带「毒」「断肠」等字样）、`restricted`、`food_record`、`unknown`；`edible`、`processed`、`limited` 留给人工审核过的词条。合并规则见 [docs/product.md](../docs/product.md#安全表达)。
+- **安全等级**：取最严。管线只会给出 `deadly`、`toxic`、`suspect`（中文名或别名里带「毒」「断肠」等字样）、`restricted`、`food_record`、`unknown`；`edible`、`processed`、`limited` 留给人工审核过的常见食物（`data/reviewed/foods.csv`，网站构建时并入）。合并规则见 [docs/product.md](../docs/product.md#安全表达)。

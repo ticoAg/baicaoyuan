@@ -35,6 +35,8 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
+`../data/reviewed/foods.csv` 是人工审核过的常见食物，也在这一步并入：一行一个食用部位，列是 `id, zh, part, level, note`，`level` 只能是 `edible`、`processed`、`limited`，同一物种可以有多行，第一行是平常吃的部位。有这份记录的物种，安全等级取第一行的等级，物种页顶部只说食用部位，部位表只列食用部位和有等级的毒性记录，不显示用途记录。`zh` 只是方便人看，和数据里的中文名对不上时构建会提示。
+
 D1 里有六张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记当天的次数（拍照识别、登录试错、申请），`edits` 和 `edit_log` 是后台的改动与记录，`users` 是维护者。同步脚本比对哈希，只写有变化的行：
 
 ```bash
