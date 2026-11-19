@@ -116,11 +116,11 @@ def clean_author(s: str) -> str:
         s = m.group(1)
     elif m := re.search(r"created by user (.+?) at Mushroom Observer", s):
         s = f"{m.group(1)}, Mushroom Observer"
-    elif m := re.search(r"Original uploader was (.+?) at ", s):
+    elif m := re.search(r"(?i)original uploader was (.+?) at ", s):
         s = m.group(1)
-    s = re.sub(r"^User:", "", s).strip(" .,;:-")
+    s = re.sub(r"\(licensed under\s*\)", "", re.sub(r"^User:", "", s)).strip(" .,;:-")
     s = re.sub(r"\s+", " ", s)
-    if re.fullmatch(r"(?i)(anonymous|unknown|unknown author|anonymous unknown author|author unknown|see below)?", s):
+    if re.fullmatch(r"(?i)((anonymous|unknown|author|see below)\s*)*", s):
         return ""
     if len(s) > 80:
         cut = s[:80].rsplit(",", 1)[0] if "," in s[:80] else s[:80].rsplit(" ", 1)[0]
