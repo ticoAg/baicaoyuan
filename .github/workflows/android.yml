@@ -38,6 +38,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic # 开源的缓存实现；默认的 enhanced 是专有组件
 
       - name: lint，构建 debug 包和不签名的 release 包
         run: ./gradlew lintDebug assembleDebug assembleRelease
@@ -68,6 +70,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic # 开源的缓存实现；默认的 enhanced 是专有组件
 
       - name: 版本号
         run: |
