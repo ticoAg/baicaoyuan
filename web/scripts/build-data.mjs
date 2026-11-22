@@ -3,6 +3,9 @@
 //   .data/species.ndjson        物种详情，一行一个物种；由 scripts/db-sync.mjs 灌进 D1
 //   public/data/search.json     浏览器内搜索索引
 //   public/data/featured/*.json 首页随机展示用的物种，分成小文件，一次取一个
+//   public/data/topics.json     专题，App 用
+//   public/data/finder.json     蘑菇特征检索的数据，App 用
+//   public/data/sources.json    数据来源和许可，App 的物种页署名用
 //   src/generated/*.json        预渲染页面（分类、专题、特征检索、关于）在构建时读取
 //
 // ../data/reviewed/foods.csv 是人工审核过的常见食物：有这份记录的物种，安全等级取平常吃的部位的结论。
@@ -305,6 +308,8 @@ const topics = [
   },
 ].map((t) => ({ ...t, items: t.items.sort((a, b) => a[4].localeCompare(b[4], 'zh-Hans-CN') || String(a[1]).localeCompare(String(b[1]), 'zh-Hans-CN')) }));
 await writeFile(path.join(GEN, 'topics.json'), JSON.stringify(topics));
+// App 也读这一份
+await writeFile(path.join(PUB, 'topics.json'), JSON.stringify(topics));
 
 // ── 蘑菇特征检索 ────────────────────────────────────────────────────
 // 只用肉眼看得到的特征。数据里的写法归到几个选项上；一个值可以算进相邻的两个颜色，宁可多留候选。
@@ -373,6 +378,7 @@ const finder = {
     .sort((a, c) => c[3] - a[3] || String(a[1]).localeCompare(String(c[1]), 'zh-Hans-CN')),
 };
 await writeFile(path.join(GEN, 'finder.json'), JSON.stringify(finder));
+await writeFile(path.join(PUB, 'finder.json'), JSON.stringify(finder));
 
 // ── 首页随机展示 ────────────────────────────────────────────────────
 // 有中文名、有图的物种，打乱后每 200 个一个文件；首页每次随机取一个文件，从里面挑。
@@ -405,6 +411,7 @@ const stats = {
 };
 await writeFile(path.join(GEN, 'stats.json'), JSON.stringify(stats));
 await writeFile(path.join(GEN, 'sources.json'), JSON.stringify(sources));
+await writeFile(path.join(PUB, 'sources.json'), JSON.stringify(sources));
 
 const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(

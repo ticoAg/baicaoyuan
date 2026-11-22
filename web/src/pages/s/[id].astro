@@ -6,7 +6,7 @@ import AidLink from '../../components/AidLink.astro';
 import Level from '../../components/Level.astro';
 import sources from '../../generated/sources.json';
 import { glyphSvg, PROVINCE_TILES, REGIONS, SITE } from '../../lib/shared.js';
-import { imagesOf, loadSpecies, notFound, REDLIST, src, unavailable, verdict } from '../../lib/species';
+import { imagesOf, isDanger, issueUrl, loadSpecies, notFound, partRows, REDLIST, src, unavailable, verdict } from '../../lib/species';
 
 export const prerender = false;
 
@@ -29,8 +29,6 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, s-maxage=3600'
 const fungus = sp.k === 'fungus';
 const title = sp.zh ?? sp.sci;
 const v = verdict(sp);
-const parts = sp.parts ?? [];
-const hazards = sp.hazards ?? [];
 const uses = sp.uses ?? [];
 const refs = sp.refs ?? [];
 const flags = sp.flags ?? [];
@@ -45,18 +43,8 @@ for (const [code, r] of Object.entries(REGIONS)) {
 }
 const regionNames = (st: string) => Object.entries(REGIONS).filter(([c]) => dist.get(c) === st).map(([, r]) => r.name);
 
-// 部位表：毒性记录和按部位的食用记录放在一张表里，最严的排前。
-// 审核过的常见食物先列食用部位，再列有等级的毒性记录。
-const rows = reviewed
-  ? [
-      // 食用部位的说明已经写在顶部结论里，表里不重复
-      ...eat.map((e) => ({ part: e.part, level: e.v as string | undefined, label: undefined as string | undefined, use: '', note: undefined as string | undefined, src: 'reviewed', ref: e.ref })),
-      ...hazards.filter((h) => h.lv).map((h) => ({ part: h.part, level: h.lv, label: h.label, use: '', note: h.note, src: h.src, ref: h.ref })),
-    ]
-  : [
-      ...hazards.map((h) => ({ part: h.part, level: h.lv, label: h.label, use: h.toxins ? `含 ${h.toxins}` : '', note: h.note, src: h.src, ref: h.ref })),
-      ...parts.map((p) => ({ part: p.part, level: p.v as string | undefined, label: undefined as string | undefined, use: p.use ?? '', note: p.note, src: p.src, ref: p.ref })),
-    ];
+// 部位表：毒性记录和按部位的食用记录放在一张表里（见 src/lib/verdict.ts）
+const rows = partRows(sp);
 const showUse = rows.some((r) => r.use);
 const showNote = rows.some((r) => r.note);
 const showUses = !reviewed && (flags.length > 0 || uses.length > 0);
@@ -73,7 +61,7 @@ const images = imagesOf(sp);
 const imgSite = (im: (typeof images)[number]) => (im.src === 'inat' ? 'iNaturalist' : im.src === 'upload' ? '来源' : 'Wikimedia Commons');
 const usedSources = sources.filter((s) => used.has(s.id));
 const famPath = `/t/${sp.fam ?? '未定科'}/`;
-const issue = `${SITE.repo}/issues/new?title=${encodeURIComponent(`纠错：${title}（${sp.sci}）`)}&body=${encodeURIComponent(`页面：${Astro.url.origin}/s/${sp.id}\n\n哪里不对：\n\n依据（文献、链接）：\n`)}`;
+const issue = issueUrl(SITE.repo, Astro.url.origin, sp);
 const links = [
   sp.powo && ['Plants of the World Online', `https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:${sp.powo}`],
   sp.k === 'plant' && ['植物智（中国植物志）', `https://www.iplant.cn/info/${encodeURIComponent(sp.sci)}`],
@@ -82,7 +70,7 @@ const links = [
   ['GBIF', `https://www.gbif.org/species/search?q=${encodeURIComponent(sp.sci)}`],
 ].filter(Boolean) as [string, string][];
 // 有毒、致命、可能有毒的物种，在结论下面给急救入口
-const danger = ['deadly', 'toxic', 'suspect'].includes(sp.safety);
+const danger = isDanger(sp.safety);
 const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v.lv.label}：${v.lines[0] ?? ''}`.slice(0, 150);
 ---
 <Base title={sp.zh ? `${sp.zh} ${sp.sci}` : sp.sci} description={description}>

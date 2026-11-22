@@ -9,7 +9,10 @@ npm run dev        # 本地开发：生成数据、灌进本地 D1、启动
 npm run build      # 生成 dist/
 npm run preview    # 构建后用 workerd 在本地跑
 npm run deploy     # 构建、把数据同步到线上 D1、发布
+npm test           # src/lib 里和 App 共用的逻辑
 ```
+
+`src/lib/` 里的 `shared.js`、`verdict.ts`、`match.ts`、`finder.ts`、`aid.ts` 是网站和 App（`../mobile/`）共用的：搜索、特征检索的筛选、安全结论和部位表、急救电话。它们不能依赖浏览器或 Worker，测试在 `test/`。
 
 ## 怎么渲染
 
@@ -26,13 +29,14 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 ## 数据
 
-`npm run data`（`scripts/build-data.mjs`）把 `../data/snapshot/*.parquet` 转成四样东西：
+`npm run data`（`scripts/build-data.mjs`）把 `../data/snapshot/*.parquet` 转成这些东西：
 
 | 产物 | 去向 |
 |---|---|
 | `.data/species.ndjson` | 物种详情，一行一个物种，由 `scripts/db-sync.mjs` 灌进 D1 |
 | `public/data/search.json` | 搜索索引，随站点发布 |
 | `public/data/featured/*.json` | 有中文名、有图的物种，打乱后每 200 种一个文件，随站点发布 |
+| `public/data/topics.json`、`finder.json`、`sources.json` | 专题、蘑菇特征检索、数据来源和许可，给 App 用 |
 | `src/generated/*.json` | 分类、专题、统计、蘑菇特征检索，预渲染时读取 |
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
