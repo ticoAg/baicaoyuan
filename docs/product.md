@@ -221,11 +221,10 @@
 | | 选择 | 原因 |
 |---|---|---|
 | 站点 | Astro，部署在 Cloudflare Workers | 首页、专题、分类预渲染成静态文件；物种页由 Worker 按需渲染 |
-| App | React Native（Expo），先出安卓 | 一套代码出安卓和 iOS；搜索、特征检索、安全结论、急救电话的代码在 `web/src/lib/`，和网站共用 |
+| App | React Native（Expo），先出安卓；推送版本 tag 时构建 APK，发布到 GitHub Releases | 一套代码出安卓和 iOS；搜索、特征检索、安全结论、急救电话的代码在 `web/src/lib/`，和网站共用 |
 | 物种数据 | Cloudflare D1，一个物种一行 JSON；渲染结果进边缘缓存 | 改一条数据不用重新部署；以后的"此时此地"需要查询 |
 | 检索 | 浏览器内索引（自建，一个静态文件） | 不需要服务器；支持别名、拼音、学名 |
 | 离线 | service worker，构建时生成 | 只缓存急救等几页，不缓存物种页和图片 |
-| Android 应用 | WebView 外壳，全屏打开线上站点；推送版本 tag 时构建 APK，发布到 GitHub Releases | 不分两套代码，内容随网站更新；不依赖 Chrome 和 Google 服务 |
 | 图谱 | Cytoscape.js，按物种取子图 | 全图太大，只在物种页显示一跳、两跳 |
 | 数据管线 | Python + DuckDB → Parquet | 与 baicao-knowledge 的结构一致 |
 | 图片 | 数据里的图只存链接，直接引用源站（Wikimedia Commons、iNaturalist）；后台上传的图存 R2。页面上标作者与许可 | 见下 |

@@ -3,7 +3,6 @@
     "name": "百草园",
     "slug": "baicaoyuan",
     "scheme": "baicaoyuan",
-    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,7 +10,6 @@
     "primaryColor": "#2c6a4c",
     "android": {
       "package": "fun.ticoag.plants",
-      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#2c6a4c",
         "foregroundImage": "./assets/android-icon-foreground.png",

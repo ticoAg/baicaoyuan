@@ -12,11 +12,10 @@ GitHub Release 正文的模板。推送版本 tag 后，.github/workflows/androi
   APK          文件名
   APK_URL      下载地址
   APK_SIZE     大小
+  MIN_ANDROID  能装的最低 Android 版本，如 7.0；从 APK 的 minSdk 推出
   APK_SHA256   APK 的 SHA-256
   CERT_SHA256  签名证书的 SHA-256，每个版本都一样
   CHANGES      GitHub 按 .github/release.yml 分类生成的改动列表
-
-最低 Android 版本写死在下面，改 android/app/build.gradle.kts 的 minSdk 时一起改。
 -->
 {{#HIGHLIGHTS}}
 {{HIGHLIGHTS}}
@@ -24,7 +23,7 @@ GitHub Release 正文的模板。推送版本 tag 后，.github/workflows/androi
 {{/HIGHLIGHTS}}
 ## 下载
 
-[{{APK}}]({{APK_URL}}) · {{APK_SIZE}} · Android 7.0 及以上
+[{{APK}}]({{APK_URL}}) · {{APK_SIZE}} · Android {{MIN_ANDROID}} 及以上
 
 | | SHA-256 |
 |---|---|

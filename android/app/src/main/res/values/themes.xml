@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 浅色主题让网页的 prefers-color-scheme 取 light，values-night 里的深色主题取 dark -->
-<resources>
-    <style name="Theme.Baicaoyuan" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/paper</item>
-        <item name="android:colorAccent">@color/accent</item>
-    </style>
-</resources>
