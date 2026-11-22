@@ -134,8 +134,13 @@ jobs:
             echo "::error::APK 是用 debug 密钥签的"
             exit 1
           fi
-          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<<"$certs" | tr a-f A-F | sed 's/../&:/g; s/:$//')
-          min_sdk=$(sed -n "s/^sdkVersion:'\([0-9]*\)'$/\1/p" <<<"$badging")
+          # apksigner 36 写“Signer #1 certificate SHA-256 digest:”，37 起写“V2 Signer: certificate SHA-256 digest:”
+          cert=$(grep -m 1 'certificate SHA-256 digest: ' <<<"$certs" | sed 's/.*digest: //' | tr a-f A-F | sed 's/../&:/g; s/:$//')
+          min_sdk=$(sed -n "s/^minSdkVersion:'\([0-9]*\)'$/\1/p" <<<"$badging")
+          if [[ -z $cert || -z $min_sdk ]]; then
+            echo "::error::从 APK 读不出签名证书或 minSdk，apksigner、aapt2 的输出格式可能又变了"
+            exit 1
+          fi
           name=baicaoyuan-$APP_VERSION.apk
           mkdir -p "$RUNNER_TEMP/dist"
           mv "$apk" "$RUNNER_TEMP/dist/$name"
