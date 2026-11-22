@@ -2,6 +2,7 @@
 // 物种页：结论在最上面，证据在最下面，中间按"人会问的顺序"排。
 // 由 Worker 按需渲染，数据来自 D1。
 import Base from '../../layouts/Base.astro';
+import AidLink from '../../components/AidLink.astro';
 import Level from '../../components/Level.astro';
 import sources from '../../generated/sources.json';
 import { glyphSvg, PROVINCE_TILES, REGIONS, SITE } from '../../lib/shared.js';
@@ -49,7 +50,7 @@ const regionNames = (st: string) => Object.entries(REGIONS).filter(([c]) => dist
 const rows = reviewed
   ? [
       // 食用部位的说明已经写在顶部结论里，表里不重复
-      ...eat.map((e) => ({ part: e.part, level: e.v as string | undefined, label: undefined as string | undefined, use: '', note: undefined as string | undefined, src: 'reviewed', ref: undefined as string | undefined })),
+      ...eat.map((e) => ({ part: e.part, level: e.v as string | undefined, label: undefined as string | undefined, use: '', note: undefined as string | undefined, src: 'reviewed', ref: e.ref })),
       ...hazards.filter((h) => h.lv).map((h) => ({ part: h.part, level: h.lv, label: h.label, use: '', note: h.note, src: h.src, ref: h.ref })),
     ]
   : [
@@ -80,6 +81,8 @@ const links = [
   sp.wd && ['Wikidata', `https://www.wikidata.org/wiki/${sp.wd}`],
   ['GBIF', `https://www.gbif.org/species/search?q=${encodeURIComponent(sp.sci)}`],
 ].filter(Boolean) as [string, string][];
+// 有毒、致命、可能有毒的物种，在结论下面给急救入口
+const danger = ['deadly', 'toxic', 'suspect'].includes(sp.safety);
 const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v.lv.label}：${v.lines[0] ?? ''}`.slice(0, 150);
 ---
 <Base title={sp.zh ? `${sp.zh} ${sp.sci}` : sp.sci} description={description}>
@@ -119,6 +122,7 @@ const description = `${title}（${sp.sci}），${sp.famZh ?? sp.fam ?? ''}。${v
             {v.tail && <p class="small">{v.tail}</p>}
           </div>
         </section>
+        {danger && <AidLink />}
         {fungus && <p class="fixed-warning">颜色、银针、虫咬都不能用来判断蘑菇有没有毒。{reviewed && '这里说的是市场上卖的栽培品，野外采到长得像的不要吃。'}</p>}
 
         {images.length > 0 && (

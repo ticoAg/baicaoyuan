@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import AidLink from '../../components/AidLink.astro';
 import SpeciesList from '../../components/SpeciesList.astro';
 import topics from '../../generated/topics.json';
 export function getStaticPaths() {
@@ -19,7 +20,9 @@ for (const it of t.items) {
     <h1 class="page-title">{t.title}</h1>
     <p class="lead">{t.lead}</p>
     <p class="note">{t.source}</p>
-    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /> <span class="muted small" style="margin-left:0.6rem">{t.items.length.toLocaleString('zh-CN')} 种</span></p>
+    {t.kind === 'danger' && <AidLink />}
+    {t.slug === 'poisonous-mushrooms' && <p><a href="/finder/">按特征检索蘑菇</a></p>}
+    <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /> <span class="muted small" style="margin-left:0.6rem;white-space:nowrap">{t.items.length.toLocaleString('zh-CN')} 种</span></p>
     <div class="topic-groups">
       {[...groups].map(([fam, items]) => (
         <div data-group>

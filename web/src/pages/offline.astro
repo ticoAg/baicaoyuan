@@ -1,0 +1,16 @@
+---
+// 没有网络、要打开的页面又不在本机缓存里时，service worker 显示这一页。
+import Base from '../layouts/Base.astro';
+---
+<Base title="没有网络" headerSearch={false}>
+  <meta slot="head" name="robots" content="noindex" />
+  <div class="wrap">
+    <h1 class="page-title">没有网络</h1>
+    <p class="lead">这一页要联网才能打开。下面几页存在本机，可以直接看：</p>
+    <ul class="offline-list">
+      <li><a href="/aid/">急救</a></li>
+      <li><a href="/finder/">蘑菇特征检索</a></li>
+      <li><a href="/topics/poisonous-mushrooms/">毒蘑菇</a></li>
+    </ul>
+  </div>
+</Base>
