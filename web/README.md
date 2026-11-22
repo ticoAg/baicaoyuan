@@ -15,12 +15,14 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 
 | 页面 | 方式 |
 |---|---|
-| 首页、专题、分类（科、属）、关于 | 构建时预渲染成静态文件 |
+| 首页、专题、分类（科、属）、关于、急救、特征检索、离线提示 | 构建时预渲染成静态文件 |
 | 物种页 `/s/{id}`、物种 JSON `/s/{id}.json` | Worker 按需渲染，数据读 D1，结果进边缘缓存 |
 | 搜索 | 浏览器里做，索引是一个静态文件 `/data/search.json` |
 | 首页的随机物种 | 浏览器里做：随机取一个 `/data/featured/{n}.json`（200 种），从里面挑 9 种 |
 | 维护后台 | `/admin/` 登录后新建词条、改名称和科属、上传图片；访客可以申请成为维护者。改动存在 D1 的 `edits` 表，图片存 R2 |
 | 拍照识别 | `/identify/` 把照片缩小后交给 `/api/identify`，Worker 转给 Pl@ntNet，再把候选学名对回 D1 里的物种 |
+| 急救 | `/aid/` 的地区和电话在浏览器里选：按时区猜，选过的记在 `localStorage` |
+| 蘑菇特征检索 | `/finder/` 在浏览器里筛选，数据 `src/generated/finder.json` 随页面脚本打包 |
 
 ## 数据
 
@@ -31,11 +33,11 @@ npm run deploy     # 构建、把数据同步到线上 D1、发布
 | `.data/species.ndjson` | 物种详情，一行一个物种，由 `scripts/db-sync.mjs` 灌进 D1 |
 | `public/data/search.json` | 搜索索引，随站点发布 |
 | `public/data/featured/*.json` | 有中文名、有图的物种，打乱后每 200 种一个文件，随站点发布 |
-| `src/generated/*.json` | 分类、专题、统计，预渲染时读取 |
+| `src/generated/*.json` | 分类、专题、统计、蘑菇特征检索，预渲染时读取 |
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
-`../data/reviewed/foods.csv` 是人工审核过的常见食物，也在这一步并入：一行一个食用部位，列是 `id, zh, part, level, note`，`level` 只能是 `edible`、`processed`、`limited`，同一物种可以有多行，第一行是平常吃的部位。有这份记录的物种，安全等级取第一行的等级，物种页顶部只说食用部位，部位表只列食用部位和有等级的毒性记录，不显示用途记录。`zh` 只是方便人看，和数据里的中文名对不上时构建会提示。
+`../data/reviewed/foods.csv` 是人工审核过的常见食物，也在这一步并入：一行一个食用部位，列是 `id, zh, part, level, note, source`，`source` 写依据（文献、链接），显示在物种页部位表的出处栏；`level` 只能是 `edible`、`processed`、`limited`，同一物种可以有多行，第一行是平常吃的部位。有这份记录的物种，安全等级取第一行的等级，物种页顶部只说食用部位，部位表只列食用部位和有等级的毒性记录，不显示用途记录。`zh` 只是方便人看，和数据里的中文名对不上时构建会提示。
 
 D1 里有六张表（`db/schema.sql`）：`species(id, hash, doc)` 一个物种一行 JSON，`meta` 记同步时间，`usage` 记当天的次数（拍照识别、登录试错、申请），`edits` 和 `edit_log` 是后台的改动与记录，`users` 是维护者。同步脚本比对哈希，只写有变化的行：
 
@@ -45,6 +47,21 @@ npm run db:remote    # 线上库
 ```
 
 不拆成多张表，是因为 D1 免费额度每天只能写 10 万行，一个物种一行（3.8 万行）才灌得进去。要做查询功能时再按需加表。
+
+蘑菇特征检索的选项和数据里写法的对应关系写在 `build-data.mjs` 的 `FINDER` 里。数据里出现没对应上的写法时，构建会提示，这个值按没有记录处理。
+
+## 手机与离线
+
+宽度不超过 900px 时，页头只留站名和搜索，底部固定五个入口：首页、识别、检索、专题、急救。
+
+站点可以加到主屏幕：`public/manifest.webmanifest`，图标在 `public/icons/`（由 `favicon.svg` 的图形生成）。
+
+`scripts/sw.mjs` 在构建结束时生成 `dist/client/sw.js`（`astro.config.mjs` 里的集成调用它）：
+
+- 预缓存急救、特征检索、毒蘑菇专题、离线提示页，以及这几页用到的 `/_astro/` 文件。版本号是这些文件内容的哈希，内容变了才装新版本。
+- 这几页先用缓存，同时在后台更新；`/_astro/` 的文件名带哈希，先用缓存；其他页面走网络，断网时显示 `/offline/`。
+- 物种页、搜索索引、图片都不缓存。
+- 只在正式构建里注册，`npm run dev` 不注册。要试离线，`npm run preview` 后打开一次 `/aid/`，再在开发者工具里断网。
 
 ## 缓存
 
@@ -58,7 +75,7 @@ npm run db:remote    # 线上库
 
 | | 额度 | 用在哪 |
 |---|---|---|
-| 静态文件 | 每个 Worker 2 万个，请求不限量 | 现在约 4,200 个 |
+| 静态文件 | 每个 Worker 2 万个，请求不限量 | 现在约 4,300 个 |
 | Worker 请求 | 每天 10 万次 | 只有物种页和物种 JSON |
 | D1 读 | 每天 500 万行 | 物种页一次读一行 |
 | D1 写 | 每天 10 万行 | 首次同步写 3.8 万行，之后只写变化的 |
@@ -102,9 +119,11 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 |---|---|
 | `scripts/build-data.mjs` | Parquet → 物种文档、搜索索引、分类与专题数据 |
 | `scripts/db-sync.mjs` | 物种文档 → D1，按哈希增量同步 |
+| `scripts/sw.mjs` | 构建后生成 service worker |
 | `db/schema.sql` | D1 表结构 |
 | `src/middleware.ts` | 物种页的边缘缓存 |
 | `src/lib/shared.js` | 构建脚本、Worker、浏览器共用的常量：安全等级、分区 |
 | `src/lib/species.ts` | 读取物种数据；物种页顶部安全结论的措辞 |
 | `src/scripts/search.ts` | 浏览器内搜索：中文名、别名、拼音、学名 |
+| `src/scripts/finder.ts` | 蘑菇特征检索的筛选 |
 | `src/pages/` | 页面 |

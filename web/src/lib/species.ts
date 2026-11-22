@@ -14,7 +14,7 @@ export interface Species {
   flags?: { f: string; src: string[]; ref?: string }[];
   traits?: [string, string][];
   /** 人工审核过的食用部位（data/reviewed/foods.csv），第一条是平常吃的部位，safety 取它的等级。 */
-  eat?: { part: string; v: keyof typeof LEVELS; note?: string }[];
+  eat?: { part: string; v: keyof typeof LEVELS; note?: string; ref?: string }[];
   /** 后台新建的词条，不来自数据管线。 */
   manual?: boolean;
   /** 数据里带的图。 */

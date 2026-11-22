@@ -1,0 +1,22 @@
+{
+  "name": "百草园",
+  "short_name": "百草园",
+  "description": "开源的中文植物与真菌图鉴：这是什么、能不能吃、怎么处理。",
+  "lang": "zh-Hans",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ec",
+  "theme_color": "#2c6a4c",
+  "icons": [
+    { "src": "/icons/192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "急救", "url": "/aid/", "icons": [{ "src": "/icons/aid-96.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "蘑菇特征检索", "short_name": "检索", "url": "/finder/" },
+    { "name": "拍照识别", "short_name": "识别", "url": "/identify/" }
+  ]
+}
