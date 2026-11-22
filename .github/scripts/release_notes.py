@@ -4,7 +4,7 @@
     python3 .github/scripts/release_notes.py v1.2.3 dist/baicaoyuan-1.2.3.apk
 
 正文的样子在 .github/release-template.md。改动列表由 GitHub 按 .github/release.yml 分类生成，
-要 gh 和有 contents: write 权限的 GH_TOKEN；签名证书指纹从环境变量 CERT_SHA256 读。
+要 gh 和有 contents: write 权限的 GH_TOKEN；签名证书指纹、最低 API 级别从环境变量 CERT_SHA256、MIN_SDK 读。
 """
 
 import hashlib
@@ -17,6 +17,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / '.github' / 'release-template.md'
 STABLE = re.compile(r'v\d+\.\d+\.\d+')
+# API 级别 → Android 版本号
+ANDROID = {
+    21: '5.0', 22: '5.1', 23: '6.0', 24: '7.0', 25: '7.1', 26: '8.0', 27: '8.1', 28: '9',
+    29: '10', 30: '11', 31: '12', 32: '12L', 33: '13', 34: '14', 35: '15', 36: '16',
+}
 
 
 def run(*args: str) -> str:
@@ -83,6 +88,7 @@ def main() -> None:
     server = os.environ.get('GITHUB_SERVER_URL', 'https://github.com')
     previous = previous_tag(tag)
     version = tag.removeprefix('v')
+    min_sdk = os.environ['MIN_SDK']
     values = {
         'VERSION': version,
         'TAG': tag,
@@ -92,6 +98,7 @@ def main() -> None:
         'APK': apk.name,
         'APK_URL': f'{server}/{repo}/releases/download/{tag}/{apk.name}',
         'APK_SIZE': size(apk.stat().st_size),
+        'MIN_ANDROID': ANDROID.get(int(min_sdk), f'API {min_sdk}'),
         'APK_SHA256': hashlib.sha256(apk.read_bytes()).hexdigest(),
         'CERT_SHA256': os.environ['CERT_SHA256'],
         'CHANGES': changes(tag, previous),

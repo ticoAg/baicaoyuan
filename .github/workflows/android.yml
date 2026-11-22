@@ -1,11 +1,12 @@
-# Android 应用：PR 里检查能不能构建；推送版本 tag 时构建签名的 APK，发布到 GitHub Release。
-# 流程、版本号规则、签名密钥的设置见 android/README.md。
+# 安卓 App（mobile/）：PR 里检查能不能构建；推送版本 tag 时构建签名的 APK，发布到 GitHub Release。
+# 流程、版本号规则、签名密钥的设置见 mobile/README.md。
 name: Android
 
 on:
   pull_request:
     paths:
-      - android/**
+      - mobile/**
+      - web/src/lib/** # 和网站共用的代码
       - .github/workflows/android.yml
   push:
     tags:
@@ -26,28 +27,35 @@ jobs:
     name: 检查
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
-        working-directory: android
+        working-directory: mobile
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-provider: basic # 开源的缓存实现；默认的 enhanced 是专有组件
 
-      - name: lint，构建 debug 包和不签名的 release 包
-        run: ./gradlew lintDebug assembleDebug assembleRelease
+      - run: npm ci
+      - name: 类型检查，lint
+        run: |
+          npm run typecheck
+          npm run lint
+      - name: 构建 release 包，用 debug 密钥签名
+        run: npm run apk
 
       - uses: actions/upload-artifact@v6
         with:
-          name: baicaoyuan-pr${{ github.event.pull_request.number }}-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: baicaoyuan-pr${{ github.event.pull_request.number }}
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -55,27 +63,30 @@ jobs:
     name: 构建
     if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
-        working-directory: android
+        working-directory: mobile
     outputs:
       apk: ${{ steps.apk.outputs.name }}
       cert: ${{ steps.apk.outputs.cert }}
+      min-sdk: ${{ steps.apk.outputs.min-sdk }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-provider: basic # 开源的缓存实现；默认的 enhanced 是专有组件
 
       - name: 版本号
         run: |
-          # tag v1.2.3 → 1.2.3；不在 tag 上时是 0.0.0-dev
+          # tag v1.2.3 → 1.2.3；不在 tag 上时是 0.0.0-dev。生成安卓工程和打包 JS 时都由 app.config.ts 读取
           if [[ $GITHUB_REF_TYPE == tag ]]; then version=${GITHUB_REF_NAME#v}; else version=0.0.0-dev; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
 
@@ -91,39 +102,59 @@ jobs:
             [[ -n ${!name} ]] || missing+=("$name")
           done
           if (( ${#missing[@]} )); then
-            echo "::error::缺少 secret：${missing[*]}。设置方法见 android/README.md"
+            echo "::error::缺少 secret：${missing[*]}。设置方法见 mobile/README.md"
             exit 1
           fi
           base64 --decode <<<"$ANDROID_KEYSTORE_BASE64" > "$RUNNER_TEMP/release.jks"
 
+      - run: npm ci
       - name: 构建签名的 APK
         env:
           BCY_KEYSTORE: ${{ runner.temp }}/release.jks
           BCY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BCY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           BCY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease -PappVersion="$APP_VERSION"
+        run: npm run apk
 
-      - name: 核对签名，按版本号命名
+      - name: 核对版本号和签名，按版本号命名
         id: apk
         run: |
-          apk=app/build/outputs/apk/release/app-release.apk
-          tools=("$ANDROID_HOME"/build-tools/*/)
-          apksigner=$(printf '%s\n' "${tools[@]}" | sort -V | tail -n 1)apksigner
-          certs=$("$apksigner" verify --print-certs "$apk")
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          versions=("$ANDROID_HOME"/build-tools/*/)
+          tools=$(printf '%s\n' "${versions[@]}" | sort -V | tail -n 1)
+          badging=$("${tools}aapt2" dump badging "$apk")
+          head -n 1 <<<"$badging"
+          if ! grep -qF "versionName='$APP_VERSION'" <<<"$badging"; then
+            echo "::error::APK 的版本号不是 $APP_VERSION"
+            exit 1
+          fi
+          certs=$("${tools}apksigner" verify --print-certs "$apk")
           echo "$certs"
-          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<<"$certs" | tr a-f A-F | sed 's/../&:/g; s/:$//')
+          if grep -qF 'CN=Android Debug' <<<"$certs"; then
+            echo "::error::APK 是用 debug 密钥签的"
+            exit 1
+          fi
+          # apksigner 36 写“Signer #1 certificate SHA-256 digest:”，37 起写“V2 Signer: certificate SHA-256 digest:”
+          cert=$(grep -m 1 'certificate SHA-256 digest: ' <<<"$certs" | sed 's/.*digest: //' | tr a-f A-F | sed 's/../&:/g; s/:$//')
+          min_sdk=$(sed -n "s/^minSdkVersion:'\([0-9]*\)'$/\1/p" <<<"$badging")
+          if [[ -z $cert || -z $min_sdk ]]; then
+            echo "::error::从 APK 读不出签名证书或 minSdk，apksigner、aapt2 的输出格式可能又变了"
+            exit 1
+          fi
           name=baicaoyuan-$APP_VERSION.apk
-          mkdir -p dist
-          mv "$apk" "dist/$name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "cert=$cert" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/dist"
+          mv "$apk" "$RUNNER_TEMP/dist/$name"
+          {
+            echo "name=$name"
+            echo "cert=$cert"
+            echo "min-sdk=$min_sdk"
+          } >> "$GITHUB_OUTPUT"
           echo "$name · 签名证书 SHA-256 $cert" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.apk.outputs.name }}
-          path: android/dist/${{ steps.apk.outputs.name }}
+          path: ${{ runner.temp }}/dist/${{ steps.apk.outputs.name }}
           if-no-files-found: error
           retention-days: 14
 
@@ -161,6 +192,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           APK: dist/${{ needs.build.outputs.apk }}
           CERT_SHA256: ${{ needs.build.outputs.cert }}
+          MIN_SDK: ${{ needs.build.outputs.min-sdk }}
         run: |
           # 附注 tag 的说明要从 tag 对象里读，重新取一次原样的 tag
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"

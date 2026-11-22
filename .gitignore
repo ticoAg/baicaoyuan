@@ -14,14 +14,7 @@ web/src/generated/
 web/public/data/
 web/.data/
 .DS_Store
-# Android
-android/.gradle/
-android/.kotlin/
-android/build/
-android/app/build/
-android/dist/
-android/local.properties
-android/.idea/
+# 签名密钥
 *.jks
 *.keystore
 
