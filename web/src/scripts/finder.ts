@@ -1,14 +1,9 @@
-// 蘑菇特征检索的筛选。规则见 src/pages/finder.astro 和 scripts/build-data.mjs 里的 FINDER。
+// 蘑菇特征检索的页面交互。筛选规则在 src/lib/finder.ts，和 App 共用。
 import data from '../generated/finder.json';
+import { filterFinder, type FinderData, type FinderItem, type Picked } from '../lib/finder';
 import { glyphSvg, LEVEL_CODES, LEVELS } from '../lib/shared.js';
 
-type Facet = { key: string; name: string; options: string[]; weak?: string; weakNote?: string };
-// [id, 中文名, 学名, 等级代码, 科, {特征: 选项序号[]}]，已按危险程度排好
-type Item = [string, string, string, number, string, Record<string, number[]>];
-
-const facets = data.facets as Facet[];
-const items = data.items as unknown as Item[];
-const DEADLY = LEVEL_CODES.indexOf('deadly');
+const finder = data as unknown as FinderData;
 
 const form = document.querySelector<HTMLFormElement>('[data-finder]');
 const out = document.querySelector<HTMLElement>('[data-out]');
@@ -16,7 +11,7 @@ const status = document.querySelector<HTMLElement>('[data-status]');
 const reset = form?.querySelector<HTMLButtonElement>('[data-reset]');
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const row = (it: Item, extra: string) => {
+const row = (it: FinderItem, extra: string) => {
   const code = (LEVEL_CODES[it[3]] ?? 'unknown') as keyof typeof LEVELS;
   const lv = LEVELS[code];
   return (
@@ -29,43 +24,16 @@ const list = (rows: string[]) => `<ul class="species-list flat">${rows.join('')}
 
 function update() {
   if (!form || !out) return;
-  const chosen = facets
-    .map((f) => ({ f, picked: [...form.querySelectorAll<HTMLInputElement>(`input[name="${f.key}"]:checked`)].map((i) => Number(i.value)) }))
-    .filter((c) => c.picked.length);
-  if (reset) reset.hidden = !chosen.length;
-  if (!chosen.length) {
+  const picked: Picked = {};
+  for (const f of finder.facets) picked[f.key] = [...form.querySelectorAll<HTMLInputElement>(`input[name="${f.key}"]:checked`)].map((i) => Number(i.value));
+  const r = filterFinder(finder, picked);
+  if (reset) reset.hidden = !r;
+  if (!r) {
     out.innerHTML = '';
     if (status) status.textContent = '';
     return;
   }
-
-  const match: Item[] = [];
-  const maybe: [Item, string][] = [];
-  for (const it of items) {
-    const missing: string[] = [];
-    const weak: string[] = [];
-    let excluded = false;
-    for (const { f, picked } of chosen) {
-      const have = it[5][f.key];
-      if (!have) {
-        missing.push(f.name);
-        continue;
-      }
-      if (picked.some((p) => have.includes(p))) continue;
-      // 只选了"没看到"，它却有：不能排除
-      if (f.weak && picked.every((p) => f.options[p] === f.weak)) {
-        weak.push(f.weakNote ?? f.name);
-        continue;
-      }
-      excluded = true;
-      break;
-    }
-    if (excluded) continue;
-    if (!missing.length && !weak.length) match.push(it);
-    else maybe.push([it, [...weak, ...(missing.length ? [`没有${missing.join('、')}记录`] : [])].join('；')]);
-  }
-
-  const deadly = [...match, ...maybe.map((m) => m[0])].filter((it) => it[3] === DEADLY);
+  const { match, maybe, deadly } = r;
   out.innerHTML = [
     deadly.length
       ? `<p class="finder-alarm">候选里有 ${deadly.length} 种致命的：${deadly
