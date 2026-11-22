@@ -1,13 +1,14 @@
 // 名称搜索：中文名、别名、拼音（全拼 / 首字母）、学名。网站和 App 共用，不依赖运行环境。
-// 索引是 /data/search.json，见 scripts/build-data.mjs。
+// 索引是 /data/search.json，见 scripts/build-data.mjs。特征检索（finder.ts）也用这份索引。
 
+import type { Facets } from './finder';
 import { slugOf } from './shared.js';
 
-/** 索引的一行：[学名, 中文名, 别名（| 分隔）, 科, 等级代码, 是否真菌] */
-export type Row = [sci: string, zh: string | 0, alias: string | 0, fam: string | 0, level: number, kingdom: number];
+/** 索引的一行：[学名, 中文名, 别名（| 分隔）, 科, 等级代码, 是否真菌, 特征码]。没有特征记录的不带特征码。 */
+export type Row = [sci: string, zh: string | 0, alias: string | 0, fam: string | 0, level: number, kingdom: number, feat?: string];
 /** 后台改过、还没进索引的词条（/api/overlay.json）。 */
 export type Patch = [id: string, ...Row];
-export interface IndexFile { rows: Row[]; py: Record<string, string> }
+export interface IndexFile { rows: Row[]; py: Record<string, string>; facets?: Facets }
 
 export interface Entry {
   /** 只有后台改过的词条带；其余的由学名算出。 */
@@ -19,6 +20,8 @@ export interface Entry {
   fam: string;
   level: number;
   fungus: boolean;
+  /** 特征码，见 finder.ts 的 decodeTraits */
+  feat: string;
 }
 export interface Hit {
   e: Entry;
@@ -26,7 +29,7 @@ export interface Hit {
   /** 命中的是别名时，显示它 */
   via?: string;
 }
-export interface SearchIndex { entries: Entry[]; py: Record<string, string[]> }
+export interface SearchIndex { entries: Entry[]; py: Record<string, string[]>; facets: Facets }
 
 const entry = (r: Row, id?: string): Entry => ({
   id,
@@ -37,6 +40,7 @@ const entry = (r: Row, id?: string): Entry => ({
   fam: r[3] || '',
   level: r[4],
   fungus: r[5] === 1,
+  feat: r[6] || '',
 });
 
 /** 物种页的 id。 */
@@ -49,10 +53,15 @@ export function buildIndex(data: IndexFile, overlay: Patch[] = []): SearchIndex 
     for (const [id, ...row] of overlay) {
       const i = at.get(id);
       if (i == null) entries.push(entry(row, id));
-      else entries[i] = entry(row, id);
+      // 后台改动不带特征码，沿用索引里的
+      else entries[i] = { ...entry(row, id), feat: row[6] || entries[i].feat };
     }
   }
-  return { entries, py: Object.fromEntries(Object.entries(data.py).map(([k, v]) => [k, v.split(',')])) };
+  return {
+    entries,
+    py: Object.fromEntries(Object.entries(data.py).map(([k, v]) => [k, v.split(',')])),
+    facets: data.facets ?? { plant: [], fungus: [] },
+  };
 }
 
 /** 拼音匹配：从名称开头起，每个字可以用全拼或首字母；最后一个音节可以只打一半。 */
