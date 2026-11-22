@@ -1,0 +1,16 @@
+# GitHub 自动生成改动列表时的分类，按 PR 的标签归类。
+# .github/scripts/release_notes.py 取这份列表，填进 .github/release-template.md 的 {{CHANGES}}。
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: 新功能
+      labels:
+        - enhancement
+    - title: 修复
+      labels:
+        - bug
+    - title: 其他
+      labels:
+        - "*"

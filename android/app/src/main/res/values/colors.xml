@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 取自 web/src/styles/global.css -->
+<resources>
+    <color name="paper">#f6f4ec</color>
+    <color name="ink">#1d2621</color>
+    <color name="ink_2">#4a554e</color>
+    <color name="accent">#2c6a4c</color>
+    <color name="icon_bg">#2c6a4c</color>
+    <color name="icon_fg">#f6f4ec</color>
+</resources>

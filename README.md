@@ -17,6 +17,7 @@
 | [data/snapshot/](data/snapshot/) | 管线输出的数据快照（Parquet） |
 | [data/reviewed/foods.csv](data/reviewed/foods.csv) | 人工审核过的常见食物：平常吃的部位、结论和依据 |
 | [web/](web/) | 网站：Astro，部署在 Cloudflare Workers |
+| [android/](android/) | Android 应用：打开网站的 WebView 外壳。推送版本 tag 时自动构建 APK，发布到 [Releases](https://github.com/ticoAg/baicaoyuan/releases) |
 | [docs/product.md](docs/product.md) | 产品形态 |
 | [docs/research.md](docs/research.md) | 同类项目与数据源调研 |
 | [docs/sources.md](docs/sources.md) | 数据源登记：地址、许可、实测结果 |
