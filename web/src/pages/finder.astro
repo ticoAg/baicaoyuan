@@ -1,40 +1,48 @@
 ---
-// 蘑菇特征检索：选看得到的特征，缩小范围。筛选在浏览器里做，数据随脚本打包，没有网络也能用。
-// 同一项里多选是"或"，不同项之间是"且"；没有记录的项不排除，放进"无法排除"。
+// 特征检索：先选植物还是蘑菇，再选看得到的特征，缩小范围。筛选在浏览器里做，数据是搜索索引（/data/search.json）。
+// 同一项里多选是"或"，不同项之间是"且"；没有记录的项不排除，放进"无法排除"。规则在 src/lib/finder.ts，和 App 共用。
 import Base from '../layouts/Base.astro';
-import SpeciesList from '../components/SpeciesList.astro';
 import finder from '../generated/finder.json';
+import { GROUPS } from '../lib/finder';
 const swatch: Record<string, string> = { 白: '#f6f3ea', 粉: '#e4aea6', 黄: '#e0bf5c', 褐: '#8a5a35', 橄榄: '#7b7b3d', 紫: '#6b4568', 黑: '#262421', 绿: '#7aa26d' };
+const n = (x: number) => x.toLocaleString('zh-CN');
 ---
-<Base title="蘑菇特征检索" description="按子实层、孢子印、菌环、菌托、菌褶着生缩小范围，候选按危险程度排序。" current="/finder/">
+<Base title="特征检索" description="先选植物还是蘑菇，再按看得到的特征缩小范围，候选按危险程度排序。" current="/finder/">
   <div class="wrap">
-    <h1 class="page-title">蘑菇特征检索</h1>
-    <p class="lead">只选看得清的特征，拿不准的不要选。</p>
+    <h1 class="page-title">特征检索</h1>
+    <p class="lead">先选植物还是蘑菇，再选看得清的特征；拿不准的不要选。</p>
     <div class="finder-layout">
       <form class="finder" data-finder>
-        {finder.facets.map((f) => (
-          <fieldset>
-            <legend>{f.name}</legend>
-            <div class="fchips">
-              {f.options.map((o, i) => (
-                <label class="fchip">
-                  <input type="checkbox" name={f.key} value={i} />
-                  <span>{f.key === 'sp' && <i style={`background:${swatch[o]}`} />}{o}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-        <p><button type="reset" class="btn" data-reset hidden>清除</button></p>
+        <fieldset>
+          <legend>是什么</legend>
+          <div class="fchips">
+            {GROUPS.map(([g, label]) => (
+              <label class="fchip"><input type="radio" name="group" value={g} /><span>{label}</span></label>
+            ))}
+          </div>
+        </fieldset>
+        {GROUPS.map(([g]) =>
+          finder.facets[g].map((f) => (
+            <fieldset data-group={g} hidden>
+              <legend>{f.name}</legend>
+              <div class="fchips">
+                {f.options.map((o, i) => (
+                  <label class="fchip">
+                    <input type="checkbox" name={f.key} value={i} />
+                    <span>{f.key === 'sp' && <i style={`background:${swatch[o]}`} />}{o}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )),
+        )}
+        <p><button type="button" class="btn" data-clear hidden>清除</button></p>
       </form>
       <div>
         <p class="visually-hidden" role="status" data-status></p>
         <div class="finder-out" data-out></div>
-        <details class="refs finder-untracked">
-          <summary>没有特征记录的有毒蘑菇 {finder.untracked.length} 种，检索不到</summary>
-          <SpeciesList items={finder.untracked} extraIndex={4} flat />
-        </details>
-        <p class="note">特征检索只用来缩小范围，不能用来确认一种蘑菇可以吃。特征来自 Wikidata，{finder.items.length} 种蘑菇有记录。</p>
+        <noscript><p class="note">特征检索需要启用 JavaScript。</p></noscript>
+        <p class="note">特征检索只用来缩小范围，不能用来确认能不能吃。植物的生活型、气候、分布来自 WCVP，{n(finder.counts.plant)} 种有记录；蘑菇的特征来自 Wikidata，{n(finder.counts.fungus)} 种有记录。</p>
       </div>
     </div>
   </div>

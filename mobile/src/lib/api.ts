@@ -1,7 +1,6 @@
 // 数据都来自网站：静态 JSON 和物种接口。下载过的存在本机，没网时用旧的。
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import type { FinderData } from '@core/finder';
 import { buildIndex, type IndexFile, type Patch, type SearchIndex } from '@core/match';
 import type { Species } from '@core/verdict';
 import { readCache, writeCache } from './store';
@@ -30,15 +29,18 @@ export class HttpError extends Error {
 /**
  * 读一份 JSON：缓存没过期就直接用；过期了带 If-None-Match 问一次，没变就续期；
  * 下载失败时退回缓存（哪怕过期了），没有缓存才报错。404 不退回。
+ * current 判断缓存是不是现在的格式，不是的当作过期。
  */
-async function getJson<T>(path: string, maxAge: number): Promise<T> {
+async function getJson<T>(path: string, maxAge: number, current: (v: T) => boolean = () => true): Promise<T> {
   const cached = await readCache(path);
-  if (cached && Date.now() - cached.at < maxAge) return JSON.parse(cached.body) as T;
+  let parsed: T | undefined;
+  const old = () => (parsed ??= JSON.parse(cached!.body) as T);
+  if (cached && Date.now() - cached.at < maxAge && current(old())) return old();
   try {
     const res = await fetch(SITE + path, { headers: cached?.etag ? { 'If-None-Match': cached.etag } : undefined });
     if (res.status === 304 && cached) {
       await writeCache(path, { ...cached, at: Date.now() });
-      return JSON.parse(cached.body) as T;
+      return old();
     }
     if (!res.ok) throw new HttpError(res.status);
     const body = await res.text();
@@ -46,7 +48,7 @@ async function getJson<T>(path: string, maxAge: number): Promise<T> {
     await writeCache(path, { body, etag: res.headers.get('etag') ?? undefined, at: Date.now() });
     return value;
   } catch (err) {
-    if (cached && !(err instanceof HttpError && err.status === 404)) return JSON.parse(cached.body) as T;
+    if (cached && !(err instanceof HttpError && err.status === 404)) return old();
     throw err;
   }
 }
@@ -65,14 +67,13 @@ function once<T>(load: () => Promise<T>) {
 
 export const loadSearchIndex = once<SearchIndex>(async () => {
   const [data, overlay] = await Promise.all([
-    getJson<IndexFile>('/data/search.json', DAY),
+    // 早先存下的索引没有特征检索的数据
+    getJson<IndexFile>('/data/search.json', DAY, (d) => !!d.facets),
     // 后台改过、还没进索引的词条。取不到就不管
     getJson<{ rows: Patch[] }>('/api/overlay.json', HOUR).catch(() => ({ rows: [] as Patch[] })),
   ]);
   return buildIndex(data, overlay.rows);
 });
-
-export const loadFinder = once(() => getJson<FinderData>('/data/finder.json', DAY));
 
 export interface Topic {
   slug: string;

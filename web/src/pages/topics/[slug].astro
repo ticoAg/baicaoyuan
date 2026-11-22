@@ -21,7 +21,7 @@ for (const it of t.items) {
     <p class="lead">{t.lead}</p>
     <p class="note">{t.source}</p>
     {t.kind === 'danger' && <AidLink />}
-    {t.slug === 'poisonous-mushrooms' && <p><a href="/finder/">按特征检索蘑菇</a></p>}
+    {t.slug === 'poisonous-mushrooms' && <p><a href="/finder/?k=fungus">按特征检索蘑菇</a></p>}
     <p style="margin-top:1rem"><input class="filter" type="search" data-filter placeholder="在本页筛选" aria-label="在本页筛选" /> <span class="muted small" style="margin-left:0.6rem;white-space:nowrap">{t.items.length.toLocaleString('zh-CN')} 种</span></p>
     <div class="topic-groups">
       {[...groups].map(([fam, items]) => (

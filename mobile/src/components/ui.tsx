@@ -120,13 +120,13 @@ export function ExtLink({ href, children, style }: { href: string; children: Rea
   );
 }
 
-/** 圆角小按钮。 */
-export function Chip({ label, on, onPress, swatch }: { label: string; on?: boolean; onPress: () => void; swatch?: string }) {
+/** 圆角小按钮：多选，或 role="radio" 时单选。 */
+export function Chip({ label, on, onPress, swatch, role = 'checkbox' }: { label: string; on?: boolean; onPress: () => void; swatch?: string; role?: 'checkbox' | 'radio' }) {
   const c = useColors();
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="checkbox"
+      accessibilityRole={role}
       accessibilityState={{ checked: !!on }}
       style={[styles.chip, { borderColor: on ? c.accent : c.rule, backgroundColor: on ? c.accent : c.surface }]}
     >

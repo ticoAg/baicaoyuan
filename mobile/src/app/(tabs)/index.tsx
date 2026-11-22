@@ -15,7 +15,7 @@ const TRIES = ['马齿苋', '钩吻', '番茄', '致命鹅膏', '香椿'];
 
 const ENTRIES: [label: string, icon: IconName, go: () => void][] = [
   ['拍照识别', 'camera', () => router.navigate('/identify')],
-  ['蘑菇特征检索', 'finder', () => router.navigate('/finder')],
+  ['特征检索', 'finder', () => router.navigate('/finder')],
   ['毒蘑菇', 'topics', () => router.push({ pathname: '/topic/[slug]', params: { slug: 'poisonous-mushrooms' } })],
   ['误食急救', 'aid', () => router.navigate('/aid')],
 ];

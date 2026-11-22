@@ -1,10 +1,11 @@
 // 构建完成后生成 service worker（dist/sw.js）。由 astro.config.mjs 里的集成调用。
 //
-// 只缓存应用外壳：急救、蘑菇特征检索、毒蘑菇专题、离线提示页，以及这几页用到的 /_astro/ 文件。
-// 物种页、搜索索引、图片都不缓存。版本号取这些文件内容的哈希，内容变了才会装新版本。
+// 预缓存应用外壳：急救、特征检索、毒蘑菇专题、离线提示页，以及这几页用到的 /_astro/ 文件。
+// 版本号取这些文件内容的哈希，内容变了才会装新版本。物种页、图片都不缓存。
 //
 //   外壳页面：先用缓存，同时在后台更新
 //   /_astro/：文件名带哈希，先用缓存
+//   搜索索引（搜索和特征检索都用）：联网时照常请求，存下一份；断网时用存的。存在单独的缓存里，换版本不清
 //   其他页面：走网络，断网时显示离线提示页
 
 import { createHash } from 'node:crypto';
@@ -46,6 +47,7 @@ export async function writeServiceWorker(dir) {
 
 const source = (version, precache) => `// 由 scripts/sw.mjs 生成，不要手改。
 const CACHE = 'bcy-${version}';
+const DATA = 'bcy-data';
 const PRECACHE = ${JSON.stringify(precache)};
 const SHELL = new Set(${JSON.stringify(SHELL)});
 
@@ -56,10 +58,18 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bcy-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bcy-') && k !== CACHE && k !== DATA).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
+
+// 内容没变（ETag 相同）就不重写
+const keep = async (req, res) => {
+  const cache = await caches.open(DATA);
+  const old = await cache.match(req);
+  const tag = res.headers.get('etag');
+  if (!old || !tag || old.headers.get('etag') !== tag) await cache.put(req, res);
+};
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -76,6 +86,18 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       })),
+    );
+    return;
+  }
+
+  if (url.pathname === '/data/search.json') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok) event.waitUntil(keep(req, res.clone()));
+          return res;
+        })
+        .catch(() => caches.open(DATA).then((c) => c.match(req)).then((hit) => hit || Response.error())),
     );
     return;
   }

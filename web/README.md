@@ -25,7 +25,7 @@ npm test           # src/lib 里和 App 共用的逻辑
 | 维护后台 | `/admin/` 登录后新建词条、改名称和科属、上传图片；访客可以申请成为维护者。改动存在 D1 的 `edits` 表，图片存 R2 |
 | 拍照识别 | `/identify/` 把照片缩小后交给 `/api/identify`，Worker 转给 Pl@ntNet，再把候选学名对回 D1 里的物种 |
 | 急救 | `/aid/` 的地区和电话在浏览器里选：按时区猜，选过的记在 `localStorage` |
-| 蘑菇特征检索 | `/finder/` 在浏览器里筛选，数据 `src/generated/finder.json` 随页面脚本打包 |
+| 特征检索 | `/finder/` 在浏览器里筛选，特征码在搜索索引里；选项预渲染在页面上，和索引里的对不上时提示刷新 |
 
 ## 数据
 
@@ -34,10 +34,10 @@ npm test           # src/lib 里和 App 共用的逻辑
 | 产物 | 去向 |
 |---|---|
 | `.data/species.ndjson` | 物种详情，一行一个物种，由 `scripts/db-sync.mjs` 灌进 D1 |
-| `public/data/search.json` | 搜索索引，随站点发布 |
+| `public/data/search.json` | 搜索索引，带特征检索用的特征码，随站点发布 |
 | `public/data/featured/*.json` | 有中文名、有图的物种，打乱后每 200 种一个文件，随站点发布 |
-| `public/data/topics.json`、`finder.json`、`sources.json` | 专题、蘑菇特征检索、数据来源和许可，给 App 用 |
-| `src/generated/*.json` | 分类、专题、统计、蘑菇特征检索，预渲染时读取 |
+| `public/data/topics.json`、`sources.json` | 专题、数据来源和许可，给 App 用 |
+| `src/generated/*.json` | 分类、专题、统计、特征检索的选项，预渲染时读取 |
 
 快照目录可以用 `BCY_DATA_DIR` 指到别处。
 
@@ -52,7 +52,7 @@ npm run db:remote    # 线上库
 
 不拆成多张表，是因为 D1 免费额度每天只能写 10 万行，一个物种一行（3.8 万行）才灌得进去。要做查询功能时再按需加表。
 
-蘑菇特征检索的选项和数据里写法的对应关系写在 `build-data.mjs` 的 `FINDER` 里。数据里出现没对应上的写法时，构建会提示，这个值按没有记录处理。
+特征检索的选项和数据里写法的对应关系写在 `build-data.mjs` 的 `FINDER` 里，植物、蘑菇各一组。数据里出现没对应上的写法时，构建会提示，这个值按没有记录处理。特征码的格式见 `src/lib/finder.ts` 的 `decodeTraits`。
 
 ## 手机与离线
 
@@ -64,7 +64,8 @@ npm run db:remote    # 线上库
 
 - 预缓存急救、特征检索、毒蘑菇专题、离线提示页，以及这几页用到的 `/_astro/` 文件。版本号是这些文件内容的哈希，内容变了才装新版本。
 - 这几页先用缓存，同时在后台更新；`/_astro/` 的文件名带哈希，先用缓存；其他页面走网络，断网时显示 `/offline/`。
-- 物种页、搜索索引、图片都不缓存。
+- 搜索索引（搜索框和特征检索都用）联网时照常请求，存一份在单独的缓存 `bcy-data` 里，断网时用存的；换版本不清，ETag 没变不重写。
+- 物种页、图片都不缓存。
 - 只在正式构建里注册，`npm run dev` 不注册。要试离线，`npm run preview` 后打开一次 `/aid/`，再在开发者工具里断网。
 
 ## 缓存
@@ -129,5 +130,5 @@ D1 的额度是整个账号共用的，不是每个数据库各算各的。
 | `src/lib/shared.js` | 构建脚本、Worker、浏览器共用的常量：安全等级、分区 |
 | `src/lib/species.ts` | 读取物种数据；物种页顶部安全结论的措辞 |
 | `src/scripts/search.ts` | 浏览器内搜索：中文名、别名、拼音、学名 |
-| `src/scripts/finder.ts` | 蘑菇特征检索的筛选 |
+| `src/scripts/finder.ts` | 特征检索页的交互，筛选规则在 `src/lib/finder.ts` |
 | `src/pages/` | 页面 |

@@ -435,7 +435,7 @@ a.cand:hover { background: var(--accent-wash); }
 .aid-steps p { margin: 0; }
 .aid-offline { margin-top: 1.4rem; }
 
-/* 蘑菇特征检索 */
+/* 特征检索 */
 .finder-layout { display: grid; grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); gap: 3rem; align-items: start; margin-top: 1.4rem; }
 .finder { position: sticky; top: 5rem; display: grid; gap: 1.05rem; }
 .finder fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -453,8 +453,6 @@ a.cand:hover { background: var(--accent-wash); }
 .finder-out .section { margin-bottom: 2rem; }
 .finder-alarm { margin: 0 0 1.4rem; padding: 0.8rem 1rem; border-radius: var(--radius); background: var(--deadly-bg); color: var(--deadly); font-weight: 600; }
 .finder-alarm a { color: var(--deadly); }
-.finder-untracked { margin: 0 0 1rem; }
-.finder-untracked .species-list { margin-top: 0.6rem; }
 
 .offline-list { font-size: 1.1rem; }
 

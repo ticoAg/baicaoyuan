@@ -67,7 +67,7 @@ export default function TopicPage() {
             <Note style={{ marginTop: 8 }}>{topic.source}</Note>
             {topic.kind === 'danger' ? <AidLink /> : null}
             {topic.slug === 'poisonous-mushrooms' ? (
-              <Pressable onPress={() => router.navigate('/finder')} style={{ marginTop: 10 }}>
+              <Pressable onPress={() => router.navigate({ pathname: '/finder', params: { k: 'fungus' } })} style={{ marginTop: 10 }}>
                 <Text style={{ color: c.accentInk, textDecorationLine: 'underline', fontSize: 15 }}>按特征检索蘑菇</Text>
               </Pressable>
             ) : null}

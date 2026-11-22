@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { guessRegion, regionOf, tel, AID_REGIONS } from '../src/lib/aid.ts';
-import { filterFinder, type FinderData, type FinderItem } from '../src/lib/finder.ts';
-import { buildIndex, entryId, searchIndex, type IndexFile } from '../src/lib/match.ts';
+import { decodeTraits, filterFinder, recordedCount, type Facets } from '../src/lib/finder.ts';
+import { buildIndex, entryId, searchIndex, type Entry, type IndexFile } from '../src/lib/match.ts';
 import { LEVEL_CODES } from '../src/lib/shared.js';
 import { isDanger, issueUrl, partRows, verdict, type Species } from '../src/lib/verdict.ts';
 
@@ -59,44 +59,76 @@ describe('名称搜索', () => {
   });
 });
 
-describe('蘑菇特征检索', () => {
-  const item = (id: string, level: string, traits: Record<string, number[]>): FinderItem => [id, id, id, code(level), 'F', traits];
-  const data: Pick<FinderData, 'facets' | 'items'> = {
-    facets: [
+describe('特征检索', () => {
+  const facets: Facets = {
+    plant: [
+      { key: 'lf', name: '生活型', options: ['乔木', '灌木', '草本', '藤本'] },
+      { key: 'rg', name: '在中国哪里有', options: ['东北', '华东—华南'] },
+    ],
+    fungus: [
       { key: 'sp', name: '孢子印', options: ['白', '褐', '黑'] },
       { key: 'ring', name: '菌环', options: ['有', '没看到'], weak: '没看到', weakNote: '有菌环，可能已脱落' },
-    ],
-    items: [
-      item('A', 'deadly', { sp: [0], ring: [0] }),
-      item('B', 'toxic', { sp: [1], ring: [1] }),
-      item('C', 'toxic', { sp: [0, 1] }),
-      item('D', 'unknown', {}),
+      { key: 'gill', name: '菌褶着生', options: ['离生', '延生'] },
     ],
   };
-  const ids = (xs: FinderItem[]) => xs.map((x) => x[0]);
+  const data: IndexFile = {
+    facets,
+    py: {},
+    rows: [
+      ['Fungus a', 'A', 0, 0, code('deadly'), 1, '0|0|0'],
+      ['Fungus b', 'B', 0, 0, code('toxic'), 1, '1|1|-'],
+      ['Fungus c', 'C', 0, 0, code('toxic'), 1, '01'],
+      ['Fungus d', 'D', 0, 0, code('unknown'), 1],
+      ['Plant a', '甲', 0, 0, code('toxic'), 0, '3|1'],
+      ['Plant b', '乙', 0, 0, code('deadly'), 0, '03|'],
+      ['Plant c', 0, 0, 0, code('unknown'), 0, '|0'],
+    ],
+  };
+  const index = buildIndex(data);
+  const sci = (xs: Entry[]) => xs.map((e) => e.sci);
+  const why = (r: ReturnType<typeof filterFinder>) => r!.maybe.map(([e, w]) => [e.sci, w]);
 
-  it('什么都没选', () => assert.equal(filterFinder(data, {}), null));
-  it('空数组算没选', () => assert.equal(filterFinder(data, { sp: [] }), null));
-  it('同一项多选是"或"', () => assert.deepEqual(ids(filterFinder(data, { sp: [0, 1] })!.match), ['A', 'B', 'C']));
+  it('解特征码', () => {
+    assert.deepEqual(decodeTraits(facets.fungus, '1|1|-'), { sp: [1], ring: [1], gill: [] });
+    assert.deepEqual(decodeTraits(facets.plant, '|0'), { rg: [0] });
+    assert.deepEqual(decodeTraits(facets.plant, ''), {});
+  });
+  it('这一类什么都没选', () => {
+    assert.equal(filterFinder(index, 'fungus', {}), null);
+    assert.equal(filterFinder(index, 'fungus', { lf: [0] }), null);
+    assert.equal(filterFinder(index, 'plant', { lf: [] }), null);
+  });
+  it('只在选的那一类里找，危险的排前', () => {
+    const r = filterFinder(index, 'plant', { lf: [3] })!;
+    assert.deepEqual(sci(r.match), ['Plant b', 'Plant a']);
+    assert.deepEqual(why(r), [['Plant c', '没有生活型记录']]);
+  });
+  it('同一项里多选是"或"', () => assert.deepEqual(sci(filterFinder(index, 'fungus', { sp: [0, 1] })!.match), ['Fungus a', 'Fungus b', 'Fungus c']));
   it('不同项是"且"，没有记录的放进无法排除', () => {
-    const r = filterFinder(data, { sp: [0], ring: [0] })!;
-    assert.deepEqual(ids(r.match), ['A']);
-    assert.deepEqual(r.maybe.map(([it, why]) => [it[0], why]), [
-      ['C', '没有菌环记录'],
-      ['D', '没有孢子印、菌环记录'],
+    const r = filterFinder(index, 'fungus', { sp: [0], gill: [0] })!;
+    assert.deepEqual(sci(r.match), ['Fungus a']);
+    assert.deepEqual(why(r), [
+      ['Fungus c', '没有菌褶着生记录'],
+      ['Fungus d', '没有孢子印、菌褶着生记录'],
     ]);
   });
+  it('有记录但不属于任何选项的排除', () => assert.ok(!sci(filterFinder(index, 'fungus', { gill: [1] })!.match).includes('Fungus b')));
   it('只选"没看到"时，有菌环的不能排除', () => {
-    const r = filterFinder(data, { ring: [1] })!;
-    assert.deepEqual(ids(r.match), ['B']);
-    assert.deepEqual(r.maybe.find(([it]) => it[0] === 'A')?.[1], '有菌环，可能已脱落');
+    const r = filterFinder(index, 'fungus', { ring: [1] })!;
+    assert.deepEqual(sci(r.match), ['Fungus b']);
+    assert.equal(r.maybe.find(([e]) => e.sci === 'Fungus a')?.[1], '有菌环，可能已脱落');
   });
-  it('列出候选里致命的', () => assert.deepEqual(ids(filterFinder(data, { ring: [1] })!.deadly), ['A']));
-  it('排除', () => {
-    const r = filterFinder(data, { sp: [2] })!;
-    assert.deepEqual(ids(r.match), []);
-    assert.deepEqual(ids(r.maybe.map((m) => m[0])), ['D']);
-    assert.deepEqual(r.deadly, []);
+  it('列出候选里致命的', () => {
+    assert.deepEqual(sci(filterFinder(index, 'fungus', { ring: [1] })!.deadly), ['Fungus a']);
+    assert.deepEqual(sci(filterFinder(index, 'plant', { rg: [0] })!.deadly), ['Plant b']);
+  });
+  it('有特征记录的种数', () => {
+    assert.equal(recordedCount(index, 'fungus'), 3);
+    assert.equal(recordedCount(index, 'plant'), 3);
+  });
+  it('后台改过的词条沿用索引里的特征码', () => {
+    const idx = buildIndex(data, [['Plant_a', 'Plant a', '甲草', 0, 0, code('toxic'), 0]]);
+    assert.deepEqual(sci(filterFinder(idx, 'plant', { lf: [3] })!.match), ['Plant b', 'Plant a']);
   });
 });
 

@@ -1,12 +1,11 @@
 // data/snapshot/*.parquet → 网站用的数据
 //
 //   .data/species.ndjson        物种详情，一行一个物种；由 scripts/db-sync.mjs 灌进 D1
-//   public/data/search.json     浏览器内搜索索引
+//   public/data/search.json     名称和特征索引：搜索、特征检索都用它
 //   public/data/featured/*.json 首页随机展示用的物种，分成小文件，一次取一个
 //   public/data/topics.json     专题，App 用
-//   public/data/finder.json     蘑菇特征检索的数据，App 用
 //   public/data/sources.json    数据来源和许可，App 的物种页署名用
-//   src/generated/*.json        预渲染页面（分类、专题、特征检索、关于）在构建时读取
+//   src/generated/*.json        预渲染页面（分类、专题、特征检索的选项、关于）在构建时读取
 //
 // ../data/reviewed/foods.csv 是人工审核过的常见食物：有这份记录的物种，安全等级取平常吃的部位的结论。
 //
@@ -23,7 +22,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { asyncBufferFromFile, parquetReadObjects } from 'hyparquet';
 import { polyphonic } from 'pinyin-pro';
-import { LEVEL_CODES, LEVELS } from '../src/lib/shared.js';
+import { LEVEL_CODES, LEVELS, REGIONS } from '../src/lib/shared.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.BCY_DATA_DIR ? path.resolve(process.env.BCY_DATA_DIR) : path.resolve(WEB, '../data/snapshot');
@@ -183,7 +182,7 @@ for (const t of taxa) {
     img: img && compact({ url: img.url, thumb: img.thumb, page: img.page, author: img.author, license: img.license, licenseUrl: img.license_url, src: img.source }),
   });
   docs.push(JSON.stringify(doc));
-  const brief = { id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety, cult: !!t.cultivated, img };
+  const brief = { id, k: t.kingdom, sci: t.sci, zh: t.zh, alias, fam: t.family, famZh: t.family_zh, gen: t.genus, genZh: t.genus_zh, safety, cult: !!t.cultivated, lf: t.lifeform, cl: t.climate, img };
   briefs.push(patches.has(id) ? patched(brief, patches.get(id)) : brief);
 }
 // 后台新建的词条
@@ -200,8 +199,107 @@ const docBytes = docs.reduce((n, d) => n + d.length, 0);
 const docMax = docs.reduce((n, d) => Math.max(n, d.length), 0);
 await writeFile(path.join(OUT, 'species.ndjson'), docs.join('\n') + '\n');
 
+// ── 特征检索 ────────────────────────────────────────────────────────
+// 先选植物还是蘑菇，再按这一类的特征筛。数据里的写法归到几个选项上；一个值可以算进几个选项，宁可多留候选。
+//
+// 植物：生活型、气候来自 WCVP，按关键词归类；分布按 TDWG 的中国大区，原生和引入都算。
+// 蘑菇：特征来自 Wikidata。菌环、菌托的"没看到"不能排除有的种类：菌环会脱落，菌托常埋在土里。
+// 丝膜不算菌环，也不算没有菌环。菌褶着生的"无"（没有菌褶）算有记录，选了任何着生方式都会排除它。
+//
+// 每个物种的特征写成一串码，放进搜索索引：这一类的各项依次排开，用 | 分隔；
+// 每项是选中的选项序号（36 进制，一位一个），"-" 是有记录但不属于任何选项，空着是没有记录。
+const traitsOf = (trait) => (b) => (G.traits.get(b.id) ?? []).filter((t) => t.trait === trait).map((t) => t.value);
+const lookup = (map) => (v) => (v in map ? map[v] : undefined);
+const words = (rules) => (v) => {
+  const hit = rules.filter(([, re]) => re.test(v)).map(([o]) => o);
+  return hit.length ? hit : undefined;
+};
+const FINDER = {
+  plant: [
+    {
+      key: 'lf', name: '生活型', options: ['乔木', '灌木', '草本', '藤本', '竹', '附生或石生', '寄生', '水生或沼生', '肉质'],
+      values: (b) => (b.lf ? [b.lf] : []),
+      to: words([
+        ['乔木', /乔木|tree/i], ['灌木', /灌木|shrub|chamaephyte/i], ['草本', /草本|地下芽|geophyte|annual|perennial/i],
+        ['藤本', /藤本|攀援|蔓生|climbing/i], ['竹', /竹|bamboo/i], ['附生或石生', /附生|石生|epiphyt|lithophyt/i],
+        ['寄生', /寄生|菌类异养|mycotroph/i], ['水生或沼生', /水生|沼生/], ['肉质', /肉质/],
+      ]),
+    },
+    {
+      key: 'cl', name: '气候', options: ['温带', '亚热带', '热带', '亚寒带或高山', '荒漠或干旱'],
+      values: (b) => (b.cl ? [b.cl] : []),
+      to: words([['温带', /温带/], ['亚热带', /亚热带/], ['热带', /(^|[^亚])热带/], ['亚寒带或高山', /寒带|高山/], ['荒漠或干旱', /荒漠|干旱灌丛/]]),
+    },
+    {
+      key: 'rg', name: '在中国哪里有', options: Object.values(REGIONS).map((r) => r.name),
+      values: (b) => (G.dist.get(b.id) ?? []).map((d) => d.area),
+      to: (code) => (REGIONS[code] ? [REGIONS[code].name] : undefined),
+    },
+  ],
+  fungus: [
+    {
+      key: 'hy', name: '子实层', options: ['菌褶', '菌孔', '菌齿', '脊状褶', '平滑', '腹菌'],
+      values: traitsOf('子实层类型'),
+      to: lookup({ 菌褶: ['菌褶'], 菌孔: ['菌孔'], 菌齿: ['菌齿'], 脊状褶: ['脊状褶'], 平滑: ['平滑'], '产孢组织（腹菌）': ['腹菌'] }),
+    },
+    {
+      key: 'sp', name: '孢子印', options: ['白', '粉', '黄', '褐', '橄榄', '紫', '黑', '绿'],
+      values: traitsOf('孢子印颜色'),
+      to: lookup({
+        白色: ['白'], 奶油色: ['白', '黄'], 粉红色: ['粉'], 鲑肉色: ['粉'], 粉褐色: ['粉', '褐'], 酒红色: ['粉', '紫'],
+        黄色: ['黄'], 橙黄色: ['黄', '褐'], 赭色: ['黄', '褐'], 浅黄褐色: ['黄', '褐'], 褐色: ['褐'], 棕褐色: ['褐'],
+        橄榄色: ['橄榄'], 橄榄褐色: ['橄榄', '褐'], 紫色: ['紫'], 紫褐色: ['紫', '褐'], 紫黑色: ['紫', '黑'],
+        黑褐色: ['褐', '黑'], 黑色: ['黑'], 绿色: ['绿'],
+      }),
+    },
+    {
+      key: 'ring', name: '菌环', options: ['有', '没看到'], weak: '没看到', weakNote: '有菌环，可能已脱落',
+      values: traitsOf('菌柄'),
+      to: lookup({ 光裸: ['没看到'], 有菌环: ['有'], 有菌环和菌托: ['有'], 有菌托: ['没看到'], 有丝膜: null }),
+    },
+    {
+      key: 'volva', name: '菌托', options: ['有', '没看到'], weak: '没看到', weakNote: '有菌托，常埋在土里',
+      values: traitsOf('菌柄'),
+      to: lookup({ 光裸: ['没看到'], 有菌环: ['没看到'], 有菌环和菌托: ['有'], 有菌托: ['有'], 有丝膜: ['没看到'] }),
+    },
+    {
+      key: 'gill', name: '菌褶着生', options: ['离生', '弯生', '直生', '延生'],
+      values: traitsOf('菌褶着生'),
+      to: lookup({ 离生: ['离生'], 后期离生: ['离生'], '弯生（狭附生）': ['弯生'], 凹生: ['弯生'], 波状弯生: ['弯生'], 直生: ['直生'], 延生: ['延生'], 稍延生: ['延生'], 无: [] }),
+    },
+  ],
+};
+const unmapped = new Set();
+const featCode = (b) => {
+  const parts = FINDER[b.k === 'fungus' ? 'fungus' : 'plant'].map((f) => {
+    let seen = false;
+    const hit = new Set();
+    for (const v of f.values(b)) {
+      const to = f.to(v);
+      if (to === undefined) {
+        unmapped.add(`${f.name}=${v}`);
+        continue;
+      }
+      if (!to) continue;
+      seen = true;
+      for (const o of to) hit.add(f.options.indexOf(o));
+    }
+    if (!seen) return '';
+    return hit.size ? [...hit].sort((x, y) => x - y).map((i) => i.toString(36)).join('') : '-';
+  });
+  return parts.some(Boolean) ? parts.join('|') : '';
+};
+const feats = new Map(briefs.map((b) => [b.id, featCode(b)]));
+if (unmapped.size) console.warn(`特征检索：这些写法没有归到选项上，按没有记录处理：${[...unmapped].join('、')}`);
+const finderFacets = Object.fromEntries(
+  Object.entries(FINDER).map(([g, fs]) => [g, fs.map(({ key, name, options, weak, weakNote }) => compact({ key, name, options, weak, weakNote }))]),
+);
+const recorded = (k) => briefs.filter((b) => (b.k === 'fungus') === (k === 'fungus') && feats.get(b.id)).length;
+// 预渲染的检索页只要选项和有记录的种数；各物种的特征在搜索索引里
+await writeFile(path.join(GEN, 'finder.json'), JSON.stringify({ facets: finderFacets, counts: { plant: recorded('plant'), fungus: recorded('fungus') } }));
+
 // ── 搜索索引 ────────────────────────────────────────────────────────
-// 一行一个物种：[学名, 中文名, 别名（| 分隔）, 科, 等级, 界]。有内容的排前面。
+// 一行一个物种：[学名, 中文名, 别名（| 分隔）, 科, 等级, 界, 特征码]，没有特征记录的不带最后一项。有内容的排前面。
 const rank = (b) => (b.zh ? 0 : 4) + (b.safety === 'unknown' ? 2 : 0) + (b.alias.length ? 0 : 1);
 const sorted = [...briefs].sort((a, b) => rank(a) - rank(b) || a.sci.localeCompare(b.sci));
 const chars = new Set();
@@ -212,9 +310,14 @@ for (const ch of chars) {
   if (readings.length) py[ch] = readings.join(',').replace(/ü/g, 'v');
 }
 const search = {
-  v: 1,
-  rows: sorted.map((b) => [b.sci, b.zh ?? 0, b.alias.join('|') || 0, b.famZh ?? b.fam ?? 0, LEVEL_CODES.indexOf(b.safety), b.k === 'fungus' ? 1 : 0]),
+  v: 2,
+  rows: sorted.map((b) => {
+    const row = [b.sci, b.zh ?? 0, b.alias.join('|') || 0, b.famZh ?? b.fam ?? 0, LEVEL_CODES.indexOf(b.safety), b.k === 'fungus' ? 1 : 0];
+    const f = feats.get(b.id);
+    return f ? [...row, f] : row;
+  }),
   py,
+  facets: finderFacets,
 };
 const searchBody = JSON.stringify(search);
 await writeFile(path.join(PUB, 'search.json'), searchBody);
@@ -311,75 +414,6 @@ await writeFile(path.join(GEN, 'topics.json'), JSON.stringify(topics));
 // App 也读这一份
 await writeFile(path.join(PUB, 'topics.json'), JSON.stringify(topics));
 
-// ── 蘑菇特征检索 ────────────────────────────────────────────────────
-// 只用肉眼看得到的特征。数据里的写法归到几个选项上；一个值可以算进相邻的两个颜色，宁可多留候选。
-// 菌环、菌托的"没看到"不能排除有的种类：菌环会脱落，菌托常埋在土里。丝膜不算菌环，也不算没有菌环。
-// 菌褶着生的"无"（没有菌褶）算有记录，选了任何着生方式都会排除它。
-const FINDER = [
-  {
-    key: 'hy', name: '子实层', trait: '子实层类型', options: ['菌褶', '菌孔', '菌齿', '脊状褶', '平滑', '腹菌'],
-    map: { 菌褶: ['菌褶'], 菌孔: ['菌孔'], 菌齿: ['菌齿'], 脊状褶: ['脊状褶'], 平滑: ['平滑'], '产孢组织（腹菌）': ['腹菌'] },
-  },
-  {
-    key: 'sp', name: '孢子印', trait: '孢子印颜色', options: ['白', '粉', '黄', '褐', '橄榄', '紫', '黑', '绿'],
-    map: {
-      白色: ['白'], 奶油色: ['白', '黄'], 粉红色: ['粉'], 鲑肉色: ['粉'], 粉褐色: ['粉', '褐'], 酒红色: ['粉', '紫'],
-      黄色: ['黄'], 橙黄色: ['黄', '褐'], 赭色: ['黄', '褐'], 浅黄褐色: ['黄', '褐'], 褐色: ['褐'], 棕褐色: ['褐'],
-      橄榄色: ['橄榄'], 橄榄褐色: ['橄榄', '褐'], 紫色: ['紫'], 紫褐色: ['紫', '褐'], 紫黑色: ['紫', '黑'],
-      黑褐色: ['褐', '黑'], 黑色: ['黑'], 绿色: ['绿'],
-    },
-  },
-  {
-    key: 'ring', name: '菌环', trait: '菌柄', options: ['有', '没看到'], weak: '没看到', weakNote: '有菌环，可能已脱落',
-    map: { 光裸: ['没看到'], 有菌环: ['有'], 有菌环和菌托: ['有'], 有菌托: ['没看到'], 有丝膜: null },
-  },
-  {
-    key: 'volva', name: '菌托', trait: '菌柄', options: ['有', '没看到'], weak: '没看到', weakNote: '有菌托，常埋在土里',
-    map: { 光裸: ['没看到'], 有菌环: ['没看到'], 有菌环和菌托: ['有'], 有菌托: ['有'], 有丝膜: ['没看到'] },
-  },
-  {
-    key: 'gill', name: '菌褶着生', trait: '菌褶着生', options: ['离生', '弯生', '直生', '延生'],
-    map: { 离生: ['离生'], 后期离生: ['离生'], '弯生（狭附生）': ['弯生'], 凹生: ['弯生'], 波状弯生: ['弯生'], 直生: ['直生'], 延生: ['延生'], 稍延生: ['延生'], 无: [] },
-  },
-];
-const unmapped = new Set();
-const finderItems = [];
-for (const b of briefs) {
-  const ts = b.k === 'fungus' && b.zh ? G.traits.get(b.id) : null;
-  if (!ts?.length) continue;
-  const f = {};
-  for (const facet of FINDER) {
-    let seen = false;
-    const hit = new Set();
-    for (const t of ts) {
-      if (t.trait !== facet.trait) continue;
-      if (!(t.value in facet.map)) {
-        unmapped.add(`${facet.trait}=${t.value}`);
-        continue;
-      }
-      const to = facet.map[t.value];
-      if (!to) continue;
-      seen = true;
-      for (const o of to) hit.add(facet.options.indexOf(o));
-    }
-    if (seen) f[facet.key] = [...hit].sort((a, c) => a - c);
-  }
-  if (Object.keys(f).length) finderItems.push([b.id, b.zh, b.sci, LEVEL_CODES.indexOf(b.safety), fam(b), f]);
-}
-if (unmapped.size) console.warn(`特征检索：这些特征值没有归到选项上，按没有记录处理：${[...unmapped].join('、')}`);
-const inFinder = new Set(finderItems.map((x) => x[0]));
-const finder = {
-  facets: FINDER.map(({ key, name, options, weak, weakNote }) => compact({ key, name, options, weak, weakNote })),
-  items: finderItems.sort((a, c) => c[3] - a[3] || a[1].localeCompare(c[1], 'zh-Hans-CN')),
-  // 有毒却没有特征记录的蘑菇，检索不到，单独列出
-  untracked: named
-    .filter((b) => b.k === 'fungus' && ['toxic', 'deadly'].includes(b.safety) && !inFinder.has(b.id))
-    .map(item)
-    .sort((a, c) => c[3] - a[3] || String(a[1]).localeCompare(String(c[1]), 'zh-Hans-CN')),
-};
-await writeFile(path.join(GEN, 'finder.json'), JSON.stringify(finder));
-await writeFile(path.join(PUB, 'finder.json'), JSON.stringify(finder));
-
 // ── 首页随机展示 ────────────────────────────────────────────────────
 // 有中文名、有图的物种，打乱后每 200 个一个文件；首页每次随机取一个文件，从里面挑。
 // 一行：[id, 中文名, 学名, 科, 等级, 缩略图, 署名]
@@ -417,5 +451,5 @@ const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(
   `数据：${briefs.length} 个物种（共 ${mb(docBytes)}，最大 ${(docMax / 1e3).toFixed(0)} KB），` +
     `审核过的常见食物 ${eats.size} 种，后台改动 ${edits.length} 条，搜索索引 ${mb(searchBody.length)}，有图 ${stats.images} 种，${taxonomy.length} 科 ${stats.genera} 属，` +
-    `特征检索 ${finder.items.length} 种，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
+    `特征检索：植物 ${recorded('plant')} 种、蘑菇 ${recorded('fungus')} 种有记录，用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒`,
 );
