@@ -94,11 +94,9 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           missing=()
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD; do
             [[ -n ${!name} ]] || missing+=("$name")
           done
           if (( ${#missing[@]} )); then
@@ -112,8 +110,9 @@ jobs:
         env:
           BCY_KEYSTORE: ${{ runner.temp }}/release.jks
           BCY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          BCY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          BCY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # 别名不放 secret：runner 会丢掉含 secret 值的 job 输出，输出 apk（baicaoyuan-1.2.3.apk）含别名
+          BCY_KEY_ALIAS: baicaoyuan
+          BCY_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }} # PKCS12 的密钥密码就是密钥库密码
         run: npm run apk
 
       - name: 核对版本号和签名，按版本号命名

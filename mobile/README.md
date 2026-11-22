@@ -123,14 +123,14 @@ keytool -genkeypair -v -keystore baicaoyuan-release.jks -alias baicaoyuan \
   -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=baicaoyuan"
 ```
 
-在仓库的 Settings → Secrets and variables → Actions 里加四个 secret：
+在仓库的 Settings → Secrets and variables → Actions 里加两个 secret：
 
 | Secret | 值 |
 |---|---|
 | `ANDROID_KEYSTORE_BASE64` | `base64 < baicaoyuan-release.jks \| tr -d '\n'` 的输出 |
 | `ANDROID_KEYSTORE_PASSWORD` | 密钥库密码 |
-| `ANDROID_KEY_ALIAS` | `baicaoyuan` |
-| `ANDROID_KEY_PASSWORD` | 密钥密码；keytool 默认的 PKCS12 格式里和密钥库密码相同 |
+
+别名 `baicaoyuan` 写在工作流里，不要设成 secret：runner 会丢掉含 secret 值的 job 输出，APK 文件名 `baicaoyuan-1.2.3.apk` 含别名，就传不到发布那一步。密钥密码用密钥库密码，keytool 默认的 PKCS12 格式里两者相同。
 
 用 GitHub CLI 也行：
 
@@ -140,14 +140,6 @@ base64 < baicaoyuan-release.jks | tr -d '\n' | gh secret set ANDROID_KEYSTORE_BA
 
 ```bash
 gh secret set ANDROID_KEYSTORE_PASSWORD
-```
-
-```bash
-gh secret set ANDROID_KEY_ALIAS --body baicaoyuan
-```
-
-```bash
-gh secret set ANDROID_KEY_PASSWORD
 ```
 
 ## 核对下载的 APK
