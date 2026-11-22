@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "百草园",
+    "slug": "baicaoyuan",
+    "scheme": "baicaoyuan",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#f6f4ec",
+    "primaryColor": "#2c6a4c",
+    "android": {
+      "package": "fun.ticoag.plants",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#2c6a4c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["android.permission.CAMERA"],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "ios": {
+      "bundleIdentifier": "fun.ticoag.plants",
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-image",
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "拍一张叶、花或果的照片来识别植物。",
+          "photosPermission": "从相册里选照片来识别植物。",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 112,
+          "backgroundColor": "#f6f4ec",
+          "dark": { "image": "./assets/splash-icon.png", "backgroundColor": "#141815" }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": { "buildArchs": ["arm64-v8a", "armeabi-v7a"] }
+        }
+      ]
+    ],
+    "experiments": { "typedRoutes": true },
+    "web": { "favicon": "./assets/favicon.png", "output": "single" }
+  }
+}
