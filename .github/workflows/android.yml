@@ -1,4 +1,5 @@
 # 安卓 App（mobile/）：PR 里检查能不能构建；推送版本 tag 时构建签名的 APK，发布到 GitHub Release。
+# 不用本地 git 也能发布：手动运行，选 main，填 tag 和说明。
 # 流程、版本号规则、签名密钥的设置见 mobile/README.md。
 name: Android
 
@@ -13,7 +14,17 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-*
   # 在分支上运行：用正式密钥构建，APK 留在运行记录里，不发布。在 tag 上运行：补发这个 tag 的 Release。
+  # 在 main 上运行并填了 tag：在 main 最新的提交上打附注 tag，再在这个 tag 上运行一次，发布 Release。
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 发布新版本时填，如 v1.2.3；只能在 main 上用
+        required: false
+        default: ''
+      message:
+        description: 新版本 tag 的说明，放在发布说明最前面
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -59,9 +70,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  tag:
+    name: 打 tag
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # 推 tag
+      actions: write # 在 tag 上再运行一次本工作流
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 核对 tag 和说明
+        env:
+          TAG: ${{ inputs.tag }}
+          MESSAGE: ${{ inputs.message }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ $GITHUB_REF != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::发布新版本只能在 $DEFAULT_BRANCH 上运行。要补发已有 tag 的 Release，选那个 tag 运行，不填 tag"
+            exit 1
+          fi
+          # 规则同 mobile/app.config.ts 的 versionCode；不合规则的 tag 推上去也构建不了
+          re='^v([0-9]+)\.([0-9]+)\.([0-9]+)(-(alpha|beta|rc)\.([0-9]+))?$'
+          if ! [[ $TAG =~ $re ]]; then
+            echo "::error::tag 要写成 v1.2.3，或 v1.2.3-alpha.1、v1.2.3-beta.1、v1.2.3-rc.1"
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]} n=${BASH_REMATCH[6]}
+          if (( 10#$major > 2000 || 10#$minor > 99 || 10#$patch > 99 )); then
+            echo "::error::主版本号不能超过 2000，次版本号、修订号不能超过 99"
+            exit 1
+          fi
+          if [[ -n $n ]] && (( 10#$n < 1 || 10#$n > 29 )); then
+            echo "::error::预发布序号只能是 1 到 29"
+            exit 1
+          fi
+          if [[ -z ${MESSAGE//[[:space:]]/} ]]; then
+            echo "::error::要写 tag 的说明"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::$TAG 已经有了。要补发它的 Release，选这个 tag 运行，不填 tag"
+            exit 1
+          fi
+
+      - name: 打附注 tag，推上去，在 tag 上运行
+        env:
+          TAG: ${{ inputs.tag }}
+          MESSAGE: ${{ inputs.message }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          printf '%s\n' "$MESSAGE" | git tag --annotate --cleanup=whitespace --file=- "$TAG"
+          git push origin "refs/tags/$TAG"
+          # 用 GITHUB_TOKEN 推的 tag 不会触发 push 事件，要手动在 tag 上运行
+          gh workflow run android.yml --ref "$TAG"
+          echo "已在 $(git rev-parse --short HEAD) 上打 $TAG。构建和发布在 tag 上的那次运行里。" >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: 构建
-    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    # 填了 tag 的手动运行只打 tag，构建和发布在 tag 上的那次运行里
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
