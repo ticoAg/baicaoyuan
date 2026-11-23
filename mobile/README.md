@@ -72,12 +72,17 @@ npm run apk
 
 ## 发布
 
+两种办法，结果一样：
+
+- 在 GitHub 的 Actions 页面手动运行「Android」，分支选 main，填 tag（如 `v1.2.3`）和说明。工作流在 main 最新的提交上打附注 tag，再在这个 tag 上运行一次。网页上的说明只能写一行；用 API 运行时可以多行，第一行是标题。
+- 本地打 tag 推上去：
+
 ```bash
 git tag -a v1.2.3 -m "这一版的要点"
 git push origin v1.2.3
 ```
 
-推送 tag 后，`.github/workflows/android.yml` 依次：
+tag 推上去后，`.github/workflows/android.yml` 依次：
 
 1. 用 secrets 里的密钥构建 APK，版本号取自 tag
 2. 核对版本号和签名，文件改名为 `baicaoyuan-1.2.3.apk`
@@ -88,8 +93,9 @@ git push origin v1.2.3
 |---|---|
 | PR 改了 `mobile/` 或 `web/src/lib/` | 类型检查、lint，构建 debug 密钥签名的 release 包，在运行记录里留 14 天 |
 | 推送 `v1.2.3`、`v1.2.3-rc.1` 这样的 tag | 构建签名的 APK，发布 Release；带 `-` 的标为预发布版 |
-| 在 Actions 页面手动运行，选分支 | 用正式密钥构建，APK 留在运行记录里，不发布；第一次发布前用它确认 secrets 设对了 |
-| 手动运行，选 tag | 补发这个 tag 的 Release；已经有了就换掉 APK、更新正文 |
+| 在 Actions 页面手动运行，选 main，填 tag 和说明 | 打附注 tag，再在这个 tag 上运行，发布 Release；tag 已经有了、不合版本号规则或者没写说明时报错，不打 tag |
+| 手动运行，选分支，不填 tag | 用正式密钥构建，APK 留在运行记录里，不发布；第一次发布前用它确认 secrets 设对了 |
+| 手动运行，选 tag，不填 tag | 补发这个 tag 的 Release；已经有了就换掉 APK、更新正文 |
 
 别的 tag（不是 `v` 加版本号的）不触发。
 
